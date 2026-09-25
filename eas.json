@@ -9,7 +9,9 @@
     },
     "preview": {
       "distribution": "internal",
-      "buildType": "app-bundle",
+      "android": {
+        "buildType": "app-bundle"
+      },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://REPLACE-ME-staging-api.example.com"
       }
