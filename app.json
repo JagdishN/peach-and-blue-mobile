@@ -12,6 +12,7 @@
     },
     "android": {
       "package": "in.peachandblue.app",
+       "versionCode": 2,
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/android-icon-foreground.png",
