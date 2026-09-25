@@ -9,10 +9,11 @@
     },
     "preview": {
       "distribution": "internal",
+      "buildType": "app-bundle",
       "env": {
         "EXPO_PUBLIC_API_URL": "https://REPLACE-ME-staging-api.example.com"
       }
-    },
+    },    
     "production": {
       "autoIncrement": true,
       "env": {

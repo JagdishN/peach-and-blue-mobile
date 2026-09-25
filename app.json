@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "mobile",
-    "slug": "mobile",
+    "slug": "peach-and-blue-backend",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -25,6 +25,12 @@
     "plugins": [
       "expo-secure-store",
       "expo-splash-screen"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "3c1acc82-402a-472b-9773-851c4b9d62bb"
+      }
+    },
+    "owner": "peachnblue"
   }
 }
