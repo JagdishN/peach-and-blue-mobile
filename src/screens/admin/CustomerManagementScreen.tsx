@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AppScreen } from '../../components/AppScreen';
 import { NivenxaFooter } from '../../components/BrandComponents';
 import { Tag } from '../../components/Tag';
@@ -21,11 +22,14 @@ import {
 } from '../../api/customers';
 import { fetchBranches, Branch } from '../../api/branches';
 import { ColorTokens, fonts, radii, spacing } from '../../theme/theme';
+import type { AdminStackParamList } from '../../navigation/AdminStack';
 
 const BILLING_MODE_LABEL: Record<BillingMode, string> = {
   daily: 'Daily',
   monthly_billing: 'Monthly Billing',
 };
+
+type Nav = NativeStackNavigationProp<AdminStackParamList>;
 
 // Admin-only (CLAUDE.md "Known gaps" — billingMode/discountEnabled/
 // discountPercent were only reachable via raw API calls before this
@@ -33,6 +37,7 @@ const BILLING_MODE_LABEL: Record<BillingMode, string> = {
 // to see billingMode read-only wherever they already do (e.g. at
 // delivery) via the existing, unrelated order-detail views.
 export const CustomerManagementScreen: React.FC = () => {
+  const navigation = useNavigation<Nav>();
   const { state } = useAuth();
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -230,8 +235,15 @@ export const CustomerManagementScreen: React.FC = () => {
   return (
     <AppScreen scroll={false}>
       <View style={styles.appbar}>
-        <Text style={styles.title}>Customers</Text>
-        <Text style={styles.subtitle}>{customers.length} total · Billing & discount, admin-only</Text>
+        <View style={styles.appbarTopRow}>
+          <View>
+            <Text style={styles.title}>Customers</Text>
+            <Text style={styles.subtitle}>{customers.length} total · Billing & discount, admin-only</Text>
+          </View>
+          <Pressable style={styles.settingsButton} onPress={() => navigation.navigate('Settings')}>
+            <Text style={styles.settingsButtonText}>⚙</Text>
+          </Pressable>
+        </View>
       </View>
 
       <View style={styles.body}>
@@ -472,6 +484,23 @@ const createStyles = (colors: ColorTokens) =>
       backgroundColor: colors.chrome,
       padding: spacing.lg,
       paddingBottom: 14,
+    },
+    appbarTopRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+    },
+    settingsButton: {
+      width: 28,
+      height: 28,
+      borderRadius: radii.pill,
+      backgroundColor: 'rgba(255,255,255,0.12)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    settingsButtonText: {
+      fontSize: 14,
+      color: colors.cream,
     },
     title: {
       fontFamily: fonts.headingSemiBold,

@@ -273,6 +273,7 @@ export const NewOrderEntryScreen: React.FC = () => {
     if (!phoneQuery) return;
     setSearching(true);
     setSearchError(null);
+    setError(null);
     try {
       const results = await searchCustomers(phoneQuery);
       setSearchResults(results);
@@ -290,6 +291,8 @@ export const NewOrderEntryScreen: React.FC = () => {
   };
 
   const selectExistingCustomer = (customer: CustomerLookup) => {
+    setSearchError(null);
+    setError(null);
     setCustomerName(customer.fullName);
     setCustomerPhoneNumber(customer.phoneNumber);
     setLocationLabel(customer.locationLabel);
@@ -305,6 +308,7 @@ export const NewOrderEntryScreen: React.FC = () => {
     }
 
     setError(null);
+    setSearchError(null);
     setConfirmingNewCustomer(true);
     try {
       const customer = await createCustomer({ fullName: customerName, phoneNumber: customerPhoneNumber, locationLabel });

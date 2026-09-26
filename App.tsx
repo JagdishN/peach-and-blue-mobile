@@ -8,6 +8,8 @@ import { RootNavigator } from './src/navigation/RootNavigator';
 import { navigationRef, navigateToOrder } from './src/navigation/navigationRef';
 import { SplashScreen } from './src/screens/shared/SplashScreen';
 import { registerForPushNotifications } from './src/services/pushNotifications';
+import { useFonts } from 'expo-font';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 const SPLASH_DURATION_MS = 2000;
 
@@ -24,15 +26,16 @@ export default function App() {
 // Shown on EVERY cold start, not just first install — CLAUDE.md is explicit
 // this is not a one-time onboarding splash. Deliberately no persisted
 // "have I shown this before" flag anywhere here. Stays up until the
-// 2-second timer has elapsed AND the stored-auth-token restore has
-// resolved — whichever finishes last. (No longer also gated on font
-// loading — theme.ts moved to the system font stack, see CLAUDE.md
-// "Branding", so there's nothing to wait on there anymore.)
+// 2-second timer has elapsed, the stored-auth-token restore has resolved,
+// and the icon fonts used by the tab bar and other vector-icons components
+// have finished loading. Otherwise Ionicons glyphs render as empty boxes on
+// the installed production app.
 function AppContent() {
   const { state } = useAuth();
   const { mode } = useTheme();
   const statusBarStyle = mode === 'dark' ? 'light' : 'dark';
   const [splashElapsed, setSplashElapsed] = useState(false);
+  const [iconsLoaded] = useFonts({ ...Ionicons.font, ...MaterialCommunityIcons.font });
 
   useEffect(() => {
     const timer = setTimeout(() => setSplashElapsed(true), SPLASH_DURATION_MS);
@@ -59,7 +62,7 @@ function AppContent() {
     return () => subscription.remove();
   }, []);
 
-  const showSplash = !splashElapsed || state.status === 'loading';
+  const showSplash = !splashElapsed || state.status === 'loading' || !iconsLoaded;
 
   if (showSplash) {
     return (

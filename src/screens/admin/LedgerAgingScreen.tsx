@@ -1,13 +1,18 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AppScreen } from '../../components/AppScreen';
 import { PriceChip } from '../../components/PriceChip';
 import { useTheme } from '../../context/ThemeContext';
 import { fetchAgingReport, sendReminder, AgingRow } from '../../api/ledger';
 import { ColorTokens, fonts, radii, spacing } from '../../theme/theme';
+import type { AdminStackParamList } from '../../navigation/AdminStack';
+
+type Nav = NativeStackNavigationProp<AdminStackParamList>;
 
 export const LedgerAgingScreen: React.FC = () => {
+  const navigation = useNavigation<Nav>();
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
@@ -45,8 +50,15 @@ export const LedgerAgingScreen: React.FC = () => {
   return (
     <AppScreen scroll={false}>
       <View style={styles.appbar}>
-        <Text style={styles.title}>Monthly Billing Ledger</Text>
-        <Text style={styles.subtitle}>Sorted by days overdue</Text>
+        <View style={styles.appbarTopRow}>
+          <View>
+            <Text style={styles.title}>Monthly Billing Ledger</Text>
+            <Text style={styles.subtitle}>Sorted by days overdue</Text>
+          </View>
+          <Pressable style={styles.settingsButton} onPress={() => navigation.navigate('Settings')}>
+            <Text style={styles.settingsButtonText}>⚙</Text>
+          </Pressable>
+        </View>
       </View>
 
       <View style={styles.body}>
@@ -95,6 +107,23 @@ const createStyles = (colors: ColorTokens) =>
       backgroundColor: colors.chrome,
       padding: spacing.lg,
       paddingBottom: 14,
+    },
+    appbarTopRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+    },
+    settingsButton: {
+      width: 28,
+      height: 28,
+      borderRadius: radii.pill,
+      backgroundColor: 'rgba(255,255,255,0.12)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    settingsButtonText: {
+      fontSize: 14,
+      color: colors.cream,
     },
     title: {
       fontFamily: fonts.headingSemiBold,

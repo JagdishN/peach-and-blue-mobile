@@ -1,7 +1,8 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AppScreen } from '../../components/AppScreen';
 import { NivenxaFooter } from '../../components/BrandComponents';
 import { Tag } from '../../components/Tag';
@@ -12,8 +13,10 @@ import { fetchUsers, createUser, StaffUser, UserRole } from '../../api/users';
 import { fetchBranches, Branch } from '../../api/branches';
 import { getDisplayName } from '../../utils/displayName';
 import { ColorTokens, fonts, radii, spacing } from '../../theme/theme';
+import type { AdminStackParamList } from '../../navigation/AdminStack';
 
 const UNSCOPED_KEY = '__unscoped__';
+type Nav = NativeStackNavigationProp<AdminStackParamList>;
 
 // Admin-only (CLAUDE.md "Staff/Admin account management" — accounts were
 // only ever created by directly seeding the DB; this is the first in-app
@@ -21,6 +24,7 @@ const UNSCOPED_KEY = '__unscoped__';
 // existing accounts (no edit/deactivate here — not asked for); the modal is
 // create-only.
 export const StaffManagementScreen: React.FC = () => {
+  const navigation = useNavigation<Nav>();
   const { state } = useAuth();
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -98,10 +102,26 @@ export const StaffManagementScreen: React.FC = () => {
       return;
     }
 
+    const digits = phoneNumber.replace(/\D/g, '');
+    let normalizedPhoneNumber = '';
+    if (digits.length === 10) {
+      normalizedPhoneNumber = `+91${digits}`;
+    } else if (digits.length === 12 && digits.startsWith('91')) {
+      normalizedPhoneNumber = `+${digits}`;
+    } else if (digits.length === 11 && digits.startsWith('0')) {
+      normalizedPhoneNumber = `+91${digits.slice(1)}`;
+    }
+
+    if (!normalizedPhoneNumber) {
+      setError('Phone number must be a valid 10-digit number or include the +91 country code.');
+      return;
+    }
+
+    setPhoneNumber(normalizedPhoneNumber);
     setSaving(true);
     setError(null);
     try {
-      await createUser({ fullName, phoneNumber, role, branchId: role === 'staff' ? branchId : branchId });
+      await createUser({ fullName, phoneNumber: normalizedPhoneNumber, role, branchId: role === 'staff' ? branchId : branchId });
       setCreating(false);
       await load();
     } catch (err) {
@@ -114,8 +134,15 @@ export const StaffManagementScreen: React.FC = () => {
   return (
     <AppScreen scroll={false}>
       <View style={styles.appbar}>
-        <Text style={styles.title}>Staff & Admin Accounts</Text>
-        <Text style={styles.subtitle}>{users.length} total · Admin-only, no passwords (OTP login)</Text>
+        <View style={styles.appbarTopRow}>
+          <View>
+            <Text style={styles.title}>Staff & Admin Accounts</Text>
+            <Text style={styles.subtitle}>{users.length} total · Admin-only, no passwords (OTP login)</Text>
+          </View>
+          <Pressable style={styles.settingsButton} onPress={() => navigation.navigate('Settings')}>
+            <Text style={styles.settingsButtonText}>⚙</Text>
+          </Pressable>
+        </View>
       </View>
 
       <View style={styles.body}>
@@ -228,6 +255,23 @@ const createStyles = (colors: ColorTokens) =>
       backgroundColor: colors.chrome,
       padding: spacing.lg,
       paddingBottom: 14,
+    },
+    appbarTopRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+    },
+    settingsButton: {
+      width: 28,
+      height: 28,
+      borderRadius: radii.pill,
+      backgroundColor: 'rgba(255,255,255,0.12)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    settingsButtonText: {
+      fontSize: 14,
+      color: colors.cream,
     },
     title: {
       fontFamily: fonts.headingSemiBold,
