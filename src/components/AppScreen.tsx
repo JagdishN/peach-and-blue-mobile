@@ -35,7 +35,18 @@ export const AppScreen: React.FC<AppScreenProps> = ({ children, scroll = true, b
           <Text style={styles.globalSettingsButtonText}>⚙</Text>
         </Pressable>
       )}
-      <Body style={styles.body} contentContainerStyle={scroll ? [styles.content, contentStyle] : undefined}>
+      {/* keyboardShouldPersistTaps: ScrollView's default ('never') swallows
+          the FIRST tap on anything else in here while a TextInput has focus
+          and the keyboard is up — it just dismisses the keyboard instead of
+          reaching the child, e.g. a Sign In button right below an OTP field
+          needing a second tap to actually register. 'handled' lets a tap on
+          another touchable go through immediately. No-op on the `scroll`
+          false branch, where Body is a plain View. */}
+      <Body
+        style={styles.body}
+        contentContainerStyle={scroll ? [styles.content, contentStyle] : undefined}
+        keyboardShouldPersistTaps="handled"
+      >
         {scroll ? children : <View style={[styles.content, contentStyle]}>{children}</View>}
       </Body>
       <NivenxaFooter />

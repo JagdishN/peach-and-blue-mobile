@@ -22,6 +22,10 @@ import type { AdminStackParamList } from '../../navigation/AdminStack';
 
 type Nav = NativeStackNavigationProp<AdminStackParamList>;
 
+// Sentinel tab key for "show every service type" — kept distinct from any
+// real serviceType string (which is free-text, see knownServiceTypes below).
+const ALL_TAB = '__all__';
+
 export const GarmentCatalogueScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
   const { colors } = useTheme();
@@ -29,6 +33,8 @@ export const GarmentCatalogueScreen: React.FC = () => {
   const serviceTag = useMemo(() => getServiceTag(colors), [colors]);
 
   const [garments, setGarments] = useState<Garment[]>([]);
+  const [activeTab, setActiveTab] = useState<string>(ALL_TAB);
+  const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Garment | 'new' | null>(null);
   const [itemName, setItemName] = useState('');
@@ -62,6 +68,47 @@ export const GarmentCatalogueScreen: React.FC = () => {
     () => Array.from(new Set(garments.map((g) => g.serviceType))).sort(),
     [garments]
   );
+
+  const SERVICE_ORDER = ['ironing', 'wash_fold', 'dry_clean'];
+
+  // Tab list is built off the unfiltered garment list (not filteredGarments)
+  // so the tab bar itself stays stable while the user types a search query —
+  // only the content beneath it should narrow.
+  const serviceTabs = useMemo(() => {
+    const present = new Set(garments.map((g) => g.serviceType));
+    return [
+      ...SERVICE_ORDER.filter((key) => present.has(key)),
+      ...Array.from(present).filter((key) => !SERVICE_ORDER.includes(key)).sort(),
+    ];
+  }, [garments]);
+
+  const filteredGarments = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return garments.filter((garment) => {
+      if (activeTab !== ALL_TAB && garment.serviceType !== activeTab) return false;
+      if (!query) return true;
+      const haystack = `${garment.itemName} ${garment.category ?? ''} ${garment.serviceType}`.toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [garments, searchQuery, activeTab]);
+
+  const groupedByService = useMemo(() => {
+    const serviceGroups = new Map<string, Garment[]>();
+    for (const garment of filteredGarments) {
+      if (!serviceGroups.has(garment.serviceType)) serviceGroups.set(garment.serviceType, []);
+      serviceGroups.get(garment.serviceType)!.push(garment);
+    }
+
+    const orderedKeys = [
+      ...SERVICE_ORDER.filter((key) => serviceGroups.has(key)),
+      ...Array.from(serviceGroups.keys()).filter((key) => !SERVICE_ORDER.includes(key)).sort(),
+    ];
+
+    return orderedKeys.map((serviceType) => ({
+      serviceType,
+      garments: serviceGroups.get(serviceType) ?? [],
+    }));
+  }, [filteredGarments]);
 
   useFocusEffect(
     useCallback(() => {
@@ -158,37 +205,101 @@ export const GarmentCatalogueScreen: React.FC = () => {
       </View>
 
       <View style={styles.body}>
+        <TextInput
+          style={styles.searchField}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder="Search garments by name, category, or service"
+          placeholderTextColor={colors.muted}
+        />
+
+        {/* Sticky/frozen by construction — this row lives in `body` above
+            the `listScroll` ScrollView below, not inside it, so it never
+            scrolls away with the list. Every chip carries a chevron: "down"
+            on whichever tab is active (currently expanded/shown) and
+            "right" on the rest (collapsed), so the expand/collapse state is
+            always visible, not just implied by highlight color. */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.tabRow}
+          contentContainerStyle={styles.tabRowContent}
+        >
+          <Pressable
+            style={[styles.tabChip, activeTab === ALL_TAB && styles.tabChipActive]}
+            onPress={() => setActiveTab(ALL_TAB)}
+          >
+            <Text style={[styles.tabChipText, activeTab === ALL_TAB && styles.tabChipTextActive]}>All</Text>
+            <MaterialCommunityIcons
+              name={activeTab === ALL_TAB ? 'chevron-down' : 'chevron-right'}
+              size={14}
+              color={activeTab === ALL_TAB ? colors.white : colors.muted}
+              style={styles.tabChipIcon}
+            />
+          </Pressable>
+          {serviceTabs.map((type) => (
+            <Pressable
+              key={type}
+              style={[styles.tabChip, activeTab === type && styles.tabChipActive]}
+              onPress={() => setActiveTab(type)}
+            >
+              <Text style={[styles.tabChipText, activeTab === type && styles.tabChipTextActive]}>
+                {serviceTag[type]?.label ?? type}
+              </Text>
+              <MaterialCommunityIcons
+                name={activeTab === type ? 'chevron-down' : 'chevron-right'}
+                size={14}
+                color={activeTab === type ? colors.white : colors.muted}
+                style={styles.tabChipIcon}
+              />
+            </Pressable>
+          ))}
+        </ScrollView>
+
         {loading ? (
           <ActivityIndicator color={colors.peachPrimary} style={{ marginTop: spacing.xl }} />
         ) : (
           <ScrollView style={styles.listScroll} showsVerticalScrollIndicator={false}>
-            {garments.map((garment) => (
-              <Pressable key={garment.id} style={styles.card} onPress={() => openEdit(garment)}>
-                <View style={styles.cardRow}>
-                  <View style={styles.nameRow}>
-                    <MaterialCommunityIcons
-                      name={(garment.iconKey ?? 'hanger') as any}
-                      size={16}
-                      color={colors.muted}
-                      style={styles.garmentIcon}
-                    />
-                    <Text style={styles.garmentName}>{garment.itemName}</Text>
-                    <Tag
-                      {...(serviceTag[garment.serviceType] ?? {
-                        label: garment.serviceType,
-                        bg: colors.peachCard,
-                        color: colors.navyText,
-                      })}
-                    />
-                    {garment.requiresSpecialCare && <Tag {...SPECIAL_CARE_TAG} />}
-                  </View>
-                  <PriceChip amount={Number(garment.price)} variant="navy" />
+            {groupedByService.length === 0 ? (
+              <Text style={styles.empty}>No garments match this search.</Text>
+            ) : (
+              groupedByService.map(({ serviceType, garments: serviceGarments }) => (
+                <View key={serviceType} style={styles.serviceBlock}>
+                  {/* Redundant once a single service tab is active — the tab
+                      chip above already names it. */}
+                  {activeTab === ALL_TAB && (
+                    <Text style={styles.sectionHeader}>{serviceTag[serviceType]?.label ?? serviceType}</Text>
+                  )}
+                  {serviceGarments.map((garment) => (
+                    <Pressable key={garment.id} style={styles.card} onPress={() => openEdit(garment)}>
+                      <View style={styles.cardRow}>
+                        <View style={styles.nameRow}>
+                          <MaterialCommunityIcons
+                            name={(garment.iconKey ?? 'hanger') as any}
+                            size={16}
+                            color={colors.muted}
+                            style={styles.garmentIcon}
+                          />
+                          <Text style={styles.garmentName}>{garment.itemName}</Text>
+                          <Tag
+                            {...(serviceTag[garment.serviceType] ?? {
+                              label: garment.serviceType,
+                              bg: colors.peachCard,
+                              color: colors.navyText,
+                            })}
+                          />
+                          {garment.requiresSpecialCare && <Tag {...SPECIAL_CARE_TAG} />}
+                        </View>
+                        <PriceChip amount={Number(garment.price)} variant="navy" />
+                      </View>
+                      {garment.category && <Text style={styles.categorySub}>{garment.category}</Text>}
+                      {garment.pricingUnit === 'per_kg' && <Text style={styles.categorySub}>Priced per kg</Text>}
+                      {garment.isStartingPrice && <Text style={styles.categorySub}>Starting price (onwards)</Text>}
+                    </Pressable>
+                  ))}
                 </View>
-                {garment.category && <Text style={styles.categorySub}>{garment.category}</Text>}
-                {garment.pricingUnit === 'per_kg' && <Text style={styles.categorySub}>Priced per kg</Text>}
-                {garment.isStartingPrice && <Text style={styles.categorySub}>Starting price (onwards)</Text>}
-              </Pressable>
-            ))}
+              ))
+            )}
           </ScrollView>
         )}
 
@@ -418,6 +529,69 @@ const createStyles = (colors: ColorTokens) =>
     listScroll: {
       flex: 1,
       minHeight: 0,
+    },
+    searchField: {
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: radii.md,
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.md,
+      fontSize: 12,
+      color: colors.navyText,
+      marginBottom: spacing.sm,
+    },
+    tabRow: {
+      flexGrow: 0,
+      marginBottom: spacing.sm,
+    },
+    tabRowContent: {
+      flexDirection: 'row',
+      gap: spacing.xs,
+      paddingRight: spacing.xs,
+    },
+    tabChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: spacing.xs,
+      paddingHorizontal: spacing.sm,
+      borderRadius: radii.pill,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+    },
+    tabChipActive: {
+      backgroundColor: colors.peachPrimary,
+      borderColor: colors.peachPrimary,
+    },
+    tabChipText: {
+      fontSize: 10.5,
+      fontWeight: '700',
+      color: colors.navyText,
+    },
+    tabChipTextActive: {
+      color: colors.white,
+    },
+    tabChipIcon: {
+      marginLeft: 2,
+    },
+    serviceBlock: {
+      marginBottom: spacing.sm,
+    },
+    sectionHeader: {
+      fontSize: 10.5,
+      fontWeight: '800',
+      textTransform: 'uppercase',
+      letterSpacing: 0.4,
+      color: colors.muted,
+      marginBottom: spacing.xs,
+      marginTop: spacing.sm,
+    },
+    empty: {
+      fontSize: 11,
+      color: colors.muted,
+      marginTop: spacing.lg,
+      textAlign: 'center',
     },
     card: {
       backgroundColor: colors.peachCard,

@@ -5,6 +5,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AppScreen } from '../../components/AppScreen';
 import { PriceChip } from '../../components/PriceChip';
+import { SanitizedTextInput } from '../../components/SanitizedTextInput';
 import { Tag } from '../../components/Tag';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -22,6 +23,8 @@ type Nav = NativeStackNavigationProp<StaffStackParamList, 'NewOrderEntry'>;
 // mirrors the backend's order-level 5kg minimum (src/services/orderService.ts)
 // so the estimate shown here matches what the server will actually charge.
 const LAUNDRY_MINIMUM_KG = 5;
+const sanitizeNameInput = (value: string) => value.replace(/[^A-Za-z\s.]/g, '').slice(0, 60);
+const sanitizePhoneInput = (value: string) => value.replace(/\D/g, '').slice(0, 10);
 
 export const NewOrderEntryScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
@@ -270,16 +273,30 @@ export const NewOrderEntryScreen: React.FC = () => {
   };
 
   const handleSearchCustomer = async () => {
-    if (!phoneQuery) return;
+    const query = phoneQuery.trim();
+    if (!query) return;
     setSearching(true);
     setSearchError(null);
     setError(null);
     try {
-      const results = await searchCustomers(phoneQuery);
-      setSearchResults(results);
-      if (results.length === 0) {
-        // No match — prefill the new-customer form with the number already typed.
-        setCustomerPhoneNumber(phoneQuery);
+      const results = await searchCustomers(query);
+      const ranked = [...results].sort((a, b) => {
+        const flatPriority = (customer: CustomerLookup) => {
+          const flatDigits = customer.locationLabel.replace(/\D/g, '').toLowerCase();
+          const flat = customer.locationLabel.toLowerCase();
+          if (flatDigits.includes(query.toLowerCase()) || flat.includes(query.toLowerCase())) return 0;
+          if (customer.phoneNumber.toLowerCase().includes(query.toLowerCase())) return 1;
+          return 2;
+        };
+
+        const aPriority = flatPriority(a);
+        const bPriority = flatPriority(b);
+        if (aPriority !== bPriority) return aPriority - bPriority;
+        return a.locationLabel.localeCompare(b.locationLabel) || a.fullName.localeCompare(b.fullName);
+      });
+      setSearchResults(ranked);
+      if (ranked.length === 0) {
+        setCustomerPhoneNumber(query);
         setCustomerName('');
         setLocationLabel('');
       }
@@ -302,8 +319,17 @@ export const NewOrderEntryScreen: React.FC = () => {
   };
 
   const handleConfirmNewCustomer = async () => {
-    if (!customerName || !locationLabel) {
+    const trimmedName = customerName.trim();
+    if (!trimmedName || !locationLabel) {
       setError('Customer name and location are required.');
+      return;
+    }
+    if (!/^[A-Za-z][A-Za-z\s.]*$/.test(trimmedName)) {
+      setError('Customer name must contain letters only; only "." and space are allowed as special characters.');
+      return;
+    }
+    if (customerPhoneNumber.length !== 10) {
+      setError('Customer phone number must contain 10 digits.');
       return;
     }
 
@@ -311,7 +337,7 @@ export const NewOrderEntryScreen: React.FC = () => {
     setSearchError(null);
     setConfirmingNewCustomer(true);
     try {
-      const customer = await createCustomer({ fullName: customerName, phoneNumber: customerPhoneNumber, locationLabel });
+      const customer = await createCustomer({ fullName: trimmedName, phoneNumber: `+91${customerPhoneNumber}`, locationLabel });
       setConfirmedCustomerId(customer.id);
       setBagIssued(customer.bagIssued);
       setCustomerConfirmed(true);
@@ -452,14 +478,15 @@ export const NewOrderEntryScreen: React.FC = () => {
           <>
             <Text style={styles.fieldLabel}>Customer Phone Number</Text>
             <View style={styles.phoneSearchRow}>
-              <TextInput
+              <SanitizedTextInput
                 testID="order-phone-search-input"
                 style={[styles.field, styles.phoneSearchInput]}
                 value={phoneQuery}
                 onChangeText={setPhoneQuery}
-                placeholder="+91 98xxxxxx45"
+                sanitize={sanitizePhoneInput}
+                placeholder="Phone / Flat No"
                 placeholderTextColor={colors.muted}
-                keyboardType="phone-pad"
+                keyboardType="number-pad"
               />
               <Pressable
                 testID="order-phone-search-button"
@@ -496,11 +523,12 @@ export const NewOrderEntryScreen: React.FC = () => {
             {searchResults !== null && searchResults.length === 0 && (
               <View style={styles.newCustomerBlock}>
                 <Text style={styles.fieldLabel}>Customer Name</Text>
-                <TextInput
+                <SanitizedTextInput
                   testID="new-customer-name-input"
                   style={styles.field}
                   value={customerName}
                   onChangeText={setCustomerName}
+                  sanitize={sanitizeNameInput}
                   placeholder="Priya Menon"
                   placeholderTextColor={colors.muted}
                 />

@@ -27,7 +27,14 @@ export interface CreateUserInput {
   branchId?: string | null;
 }
 
+export type UpdateUserInput = Partial<CreateUserInput>;
+
 // No password — auth is OTP-only, this just creates the account record so
 // the phone number can log in.
 export const createUser = (input: CreateUserInput) =>
   apiRequest<{ user: StaffUser }>('/api/users', { method: 'POST', body: input }).then((res) => res.user);
+
+export const updateUser = (id: string, input: UpdateUserInput) =>
+  apiRequest<{ user: StaffUser }>(`/api/users/${id}`, { method: 'PATCH', body: input }).then((res) => res.user);
+
+export const deleteUser = (id: string) => apiRequest<void>(`/api/users/${id}`, { method: 'DELETE' });

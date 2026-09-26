@@ -1,15 +1,16 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Alert, ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AppScreen } from '../../components/AppScreen';
 import { NivenxaFooter } from '../../components/BrandComponents';
+import { SanitizedTextInput } from '../../components/SanitizedTextInput';
 import { Tag } from '../../components/Tag';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { ApiError } from '../../api/client';
-import { fetchUsers, createUser, StaffUser, UserRole } from '../../api/users';
+import { fetchUsers, createUser, updateUser, deleteUser, StaffUser, UserRole } from '../../api/users';
 import { fetchBranches, Branch } from '../../api/branches';
 import { getDisplayName } from '../../utils/displayName';
 import { ColorTokens, fonts, radii, spacing } from '../../theme/theme';
@@ -17,6 +18,9 @@ import type { AdminStackParamList } from '../../navigation/AdminStack';
 
 const UNSCOPED_KEY = '__unscoped__';
 type Nav = NativeStackNavigationProp<AdminStackParamList>;
+
+const sanitizeNameInput = (value: string) => value.replace(/[^A-Za-z\s.]/g, '').slice(0, 60);
+const sanitizePhoneInput = (value: string) => value.replace(/\D/g, '').slice(0, 10);
 
 // Admin-only (CLAUDE.md "Staff/Admin account management" — accounts were
 // only ever created by directly seeding the DB; this is the first in-app
@@ -34,6 +38,7 @@ export const StaffManagementScreen: React.FC = () => {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [fullName, setFullName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [role, setRole] = useState<UserRole>('staff');
@@ -80,21 +85,52 @@ export const StaffManagementScreen: React.FC = () => {
   }, [users, branchNameById]);
 
   const openNew = () => {
+    setEditingUserId(null);
     setFullName('');
     setPhoneNumber('');
     setRole('staff');
-    // Default branch selection is Attapur (the client's first live branch —
-    // CLAUDE.md "Branches") when present, rather than just "whichever
-    // branch happens to be first in the list."
     const attapur = branches.find((b) => b.branchName === 'Attapur');
     setBranchId(user?.branchId ?? attapur?.id ?? branches[0]?.id ?? null);
     setError(null);
     setCreating(true);
   };
 
+  const openEdit = (staff: StaffUser) => {
+    setEditingUserId(staff.id);
+    setFullName(staff.fullName);
+    setPhoneNumber(staff.phoneNumber.replace(/^\+91/, ''));
+    setRole(staff.role);
+    setBranchId(staff.branchId ?? user?.branchId ?? null);
+    setError(null);
+    setCreating(true);
+  };
+
+  const handleDelete = async (staff: StaffUser) => {
+    Alert.alert('Delete staff account', `Delete ${staff.fullName}? This cannot be undone.`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteUser(staff.id);
+            await load();
+          } catch (err) {
+            setError(err instanceof ApiError ? err.message : 'Could not delete this account.');
+          }
+        },
+      },
+    ]);
+  };
+
   const handleCreate = async () => {
-    if (!fullName || !phoneNumber) {
+    const trimmedName = fullName.trim();
+    if (!trimmedName || !phoneNumber) {
       setError('Name and phone number are required.');
+      return;
+    }
+    if (!/^[A-Za-z][A-Za-z\s.]*$/.test(trimmedName)) {
+      setError('Name must contain letters only; only "." and space are allowed as special characters.');
       return;
     }
     if (role === 'staff' && !branchId) {
@@ -102,7 +138,7 @@ export const StaffManagementScreen: React.FC = () => {
       return;
     }
 
-    const digits = phoneNumber.replace(/\D/g, '');
+    const digits = sanitizePhoneInput(phoneNumber);
     let normalizedPhoneNumber = '';
     if (digits.length === 10) {
       normalizedPhoneNumber = `+91${digits}`;
@@ -113,7 +149,7 @@ export const StaffManagementScreen: React.FC = () => {
     }
 
     if (!normalizedPhoneNumber) {
-      setError('Phone number must be a valid 10-digit number or include the +91 country code.');
+      setError('Phone number must be a valid 10-digit number or include a valid country code.');
       return;
     }
 
@@ -121,11 +157,16 @@ export const StaffManagementScreen: React.FC = () => {
     setSaving(true);
     setError(null);
     try {
-      await createUser({ fullName, phoneNumber: normalizedPhoneNumber, role, branchId: role === 'staff' ? branchId : branchId });
+      if (editingUserId) {
+        await updateUser(editingUserId, { fullName: trimmedName, phoneNumber: normalizedPhoneNumber, role, branchId });
+      } else {
+        await createUser({ fullName: trimmedName, phoneNumber: normalizedPhoneNumber, role, branchId });
+      }
       setCreating(false);
+      setEditingUserId(null);
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not create this account.');
+      setError(err instanceof ApiError ? err.message : editingUserId ? 'Could not update this account.' : 'Could not create this account.');
     } finally {
       setSaving(false);
     }
@@ -162,6 +203,14 @@ export const StaffManagementScreen: React.FC = () => {
                       </View>
                     </View>
                     <Text style={styles.cardSub}>{u.phoneNumber}</Text>
+                    <View style={styles.actionRow}>
+                      <Pressable style={styles.inlineAction} onPress={() => openEdit(u)}>
+                        <Text style={styles.inlineActionText}>Edit</Text>
+                      </Pressable>
+                      <Pressable style={[styles.inlineAction, styles.inlineActionDanger]} onPress={() => handleDelete(u)}>
+                        <Text style={styles.inlineActionText}>Delete</Text>
+                      </Pressable>
+                    </View>
                   </View>
                 ))}
               </View>
@@ -177,25 +226,27 @@ export const StaffManagementScreen: React.FC = () => {
       <Modal visible={creating} transparent animationType="slide" onRequestClose={() => setCreating(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Add Staff / Admin</Text>
+            <Text style={styles.modalTitle}>{editingUserId ? 'Edit Staff / Admin' : 'Add Staff / Admin'}</Text>
 
             <Text style={styles.fieldLabel}>Name</Text>
-            <TextInput
+            <SanitizedTextInput
               style={styles.field}
               value={fullName}
               onChangeText={setFullName}
+              sanitize={sanitizeNameInput}
               placeholder="Ramesh Kumar"
               placeholderTextColor={colors.muted}
             />
 
             <Text style={styles.fieldLabel}>Phone Number</Text>
-            <TextInput
+            <SanitizedTextInput
               style={styles.field}
               value={phoneNumber}
               onChangeText={setPhoneNumber}
-              placeholder="+919xxxxxxxxx"
+              sanitize={sanitizePhoneInput}
+              placeholder="9876543210"
               placeholderTextColor={colors.muted}
-              keyboardType="phone-pad"
+              keyboardType="number-pad"
             />
 
             <Text style={styles.fieldLabel}>Is Staff</Text>
@@ -228,7 +279,7 @@ export const StaffManagementScreen: React.FC = () => {
             {error && <Text style={styles.error}>{error}</Text>}
 
             <Pressable style={[styles.saveButton, saving && styles.saveButtonDisabled]} onPress={handleCreate} disabled={saving}>
-              {saving ? <ActivityIndicator color={colors.white} /> : <Text style={styles.saveButtonText}>Create Account</Text>}
+              {saving ? <ActivityIndicator color={colors.white} /> : <Text style={styles.saveButtonText}>{editingUserId ? 'Save Changes' : 'Create Account'}</Text>}
             </Pressable>
 
             <Pressable style={styles.cancelButton} onPress={() => setCreating(false)}>
@@ -326,6 +377,29 @@ const createStyles = (colors: ColorTokens) =>
       fontSize: 10.5,
       color: colors.muted,
       marginTop: 3,
+    },
+    actionRow: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      gap: spacing.sm,
+      marginTop: spacing.sm,
+    },
+    inlineAction: {
+      paddingVertical: 6,
+      paddingHorizontal: 10,
+      borderRadius: radii.md,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+    },
+    inlineActionDanger: {
+      borderColor: colors.danger,
+      backgroundColor: colors.warningBg,
+    },
+    inlineActionText: {
+      color: colors.navyText,
+      fontSize: 10,
+      fontWeight: '700',
     },
     empty: {
       fontSize: 11,

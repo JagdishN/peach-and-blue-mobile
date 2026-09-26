@@ -69,6 +69,8 @@ export interface CreateCustomerInput {
   branchId?: string;
 }
 
+export type UpdateCustomerInput = Partial<CreateCustomerInput>;
+
 // Idempotent — looked up by (phoneNumber, branchId, locationLabel) same as
 // order creation's own upsert; safe to call even if the customer already
 // exists for this phone+flat.
@@ -76,6 +78,13 @@ export const createCustomer = (input: CreateCustomerInput) =>
   apiRequest<{ customer: CustomerLookup }>('/api/v1/customers', { method: 'POST', body: input }).then(
     (res) => res.customer
   );
+
+export const updateCustomer = (id: string, input: UpdateCustomerInput) =>
+  apiRequest<{ customer: Customer }>('/api/v1/customers/' + id, { method: 'PATCH', body: input }).then(
+    (res) => res.customer
+  );
+
+export const deleteCustomer = (id: string) => apiRequest<void>('/api/v1/customers/' + id, { method: 'DELETE' });
 
 // Staff + admin — CLAUDE.md "Laundry bag tracking". Idempotent server-side:
 // safe to call even if the customer already has a bag.

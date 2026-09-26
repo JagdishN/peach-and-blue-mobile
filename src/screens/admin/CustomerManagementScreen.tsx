@@ -4,6 +4,7 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AppScreen } from '../../components/AppScreen';
 import { NivenxaFooter } from '../../components/BrandComponents';
+import { SanitizedTextInput } from '../../components/SanitizedTextInput';
 import { Tag } from '../../components/Tag';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -11,6 +12,8 @@ import { ApiError } from '../../api/client';
 import {
   fetchCustomers,
   createCustomer,
+  updateCustomer,
+  deleteCustomer,
   updateCustomerBillingMode,
   updateCustomerDiscountEnabled,
   updateCustomerDiscountPercent,
@@ -29,6 +32,9 @@ const BILLING_MODE_LABEL: Record<BillingMode, string> = {
   monthly_billing: 'Monthly Billing',
 };
 
+const sanitizeNameInput = (value: string) => value.replace(/[^A-Za-z\s.]/g, '').slice(0, 60);
+const sanitizePhoneInput = (value: string) => value.replace(/\D/g, '').slice(0, 10);
+
 type Nav = NativeStackNavigationProp<AdminStackParamList>;
 
 // Admin-only (CLAUDE.md "Known gaps" — billingMode/discountEnabled/
@@ -44,8 +50,12 @@ export const CustomerManagementScreen: React.FC = () => {
   const user = state.status === 'signedIn' ? state.user : null;
 
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Customer | null>(null);
+  const [editFullName, setEditFullName] = useState('');
+  const [editPhoneNumber, setEditPhoneNumber] = useState('');
+  const [editLocationLabel, setEditLocationLabel] = useState('');
   const [billingMode, setBillingMode] = useState<BillingMode>('daily');
   const [discountEnabled, setDiscountEnabled] = useState(false);
   const [discountPercentInput, setDiscountPercentInput] = useState('');
@@ -104,16 +114,47 @@ export const CustomerManagementScreen: React.FC = () => {
   // unscoped admin sees every branch's customers sectioned; a branch-scoped
   // admin's list is already narrowed to one branch server-side, so this
   // just produces a single section for them.
+  const filteredCustomers = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return customers;
+
+    return [...customers]
+      .filter((customer) => {
+        const flatDigits = customer.locationLabel.replace(/\D/g, '').toLowerCase();
+        const flat = customer.locationLabel.toLowerCase();
+        const phone = customer.phoneNumber.toLowerCase();
+        const name = customer.fullName.toLowerCase();
+        return flat.includes(query) || flatDigits.includes(query) || phone.includes(query) || name.includes(query);
+      })
+      .sort((a, b) => {
+        const getPriority = (customer: Customer) => {
+          const flatDigits = customer.locationLabel.replace(/\D/g, '').toLowerCase();
+          const flat = customer.locationLabel.toLowerCase();
+          const phone = customer.phoneNumber.toLowerCase();
+          const name = customer.fullName.toLowerCase();
+          if (flatDigits.includes(query) || flat.includes(query)) return 0;
+          if (phone.includes(query)) return 1;
+          if (name.includes(query)) return 2;
+          return 3;
+        };
+
+        const aPriority = getPriority(a);
+        const bPriority = getPriority(b);
+        if (aPriority !== bPriority) return aPriority - bPriority;
+        return a.locationLabel.localeCompare(b.locationLabel) || a.fullName.localeCompare(b.fullName);
+      });
+  }, [customers, searchQuery]);
+
   const sections = useMemo(() => {
     const byBranch = new Map<string, { branchName: string; customers: Customer[] }>();
-    for (const customer of customers) {
+    for (const customer of filteredCustomers) {
       if (!byBranch.has(customer.branchId)) {
         byBranch.set(customer.branchId, { branchName: customer.branch.branchName, customers: [] });
       }
       byBranch.get(customer.branchId)!.customers.push(customer);
     }
     return Array.from(byBranch.values());
-  }, [customers]);
+  }, [filteredCustomers]);
 
   const openNewCustomer = () => {
     setNewFullName('');
@@ -125,8 +166,13 @@ export const CustomerManagementScreen: React.FC = () => {
   };
 
   const handleCreateCustomer = async () => {
-    if (!newFullName || !newPhoneNumber || !newLocationLabel) {
+    const trimmedName = newFullName.trim();
+    if (!trimmedName || !newPhoneNumber || !newLocationLabel) {
       setCreateError('Name, phone number, and location are required.');
+      return;
+    }
+    if (!/^[A-Za-z][A-Za-z\s.]*$/.test(trimmedName)) {
+      setCreateError('Customer name must contain letters only; only "." and space are allowed as special characters.');
       return;
     }
     if (!user?.branchId && !newBranchId) {
@@ -134,12 +180,18 @@ export const CustomerManagementScreen: React.FC = () => {
       return;
     }
 
+    const digits = sanitizePhoneInput(newPhoneNumber);
+    if (digits.length !== 10) {
+      setCreateError('Phone number must contain exactly 10 digits.');
+      return;
+    }
+
     setCreatingSaving(true);
     setCreateError(null);
     try {
       await createCustomer({
-        fullName: newFullName,
-        phoneNumber: newPhoneNumber,
+        fullName: trimmedName,
+        phoneNumber: `+91${digits}`,
         locationLabel: newLocationLabel,
         branchId: user?.branchId ?? newBranchId ?? undefined,
       });
@@ -154,6 +206,9 @@ export const CustomerManagementScreen: React.FC = () => {
 
   const openEdit = (customer: Customer) => {
     setEditing(customer);
+    setEditFullName(customer.fullName);
+    setEditPhoneNumber(customer.phoneNumber.replace(/^\+91/, ''));
+    setEditLocationLabel(customer.locationLabel);
     setBillingMode(customer.billingMode);
     setDiscountEnabled(customer.discountEnabled);
     setDiscountPercentInput(customer.discountPercent ?? '0');
@@ -163,6 +218,76 @@ export const CustomerManagementScreen: React.FC = () => {
     fetchBagReplacements(customer.id)
       .then((charges) => setBagReplacementCount(charges.length))
       .catch(() => setBagReplacementCount(null));
+  };
+
+  const handleDeleteCustomer = async () => {
+    if (!editing) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await deleteCustomer(editing.id);
+      setEditing(null);
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not delete this customer.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleUpdateCustomer = async () => {
+    if (!editing) return;
+
+    const trimmedName = editFullName.trim();
+    const digits = sanitizePhoneInput(editPhoneNumber);
+    if (!trimmedName || !digits || !editLocationLabel.trim()) {
+      setError('Name, phone number, and flat number are all required.');
+      return;
+    }
+    if (!/^[A-Za-z][A-Za-z\s.]*$/.test(trimmedName)) {
+      setError('Customer name must contain letters only; only "." and space are allowed as special characters.');
+      return;
+    }
+    if (digits.length !== 10) {
+      setError('Phone number must contain exactly 10 digits.');
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+    try {
+      await updateCustomer(editing.id, {
+        fullName: trimmedName,
+        phoneNumber: `+91${digits}`,
+        locationLabel: editLocationLabel.trim(),
+      });
+
+      if (billingMode !== editing.billingMode) {
+        await updateCustomerBillingMode(editing.id, billingMode);
+      }
+      if (discountEnabled !== editing.discountEnabled) {
+        await updateCustomerDiscountEnabled(editing.id, discountEnabled);
+      }
+      if (discountEnabled) {
+        const newPercent = Number(discountPercentInput);
+        const storedPercent = Number(editing.discountPercent ?? 0);
+        if (Number.isNaN(newPercent) || newPercent < 0 || newPercent > 100) {
+          setError('Discount percent must be a number between 0 and 100.');
+          setSaving(false);
+          return;
+        }
+        if (newPercent !== storedPercent) {
+          await updateCustomerDiscountPercent(editing.id, newPercent);
+        }
+      }
+
+      setEditing(null);
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not update this customer.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleIssueBag = async () => {
@@ -240,10 +365,18 @@ export const CustomerManagementScreen: React.FC = () => {
       </View>
 
       <View style={styles.body}>
+        <TextInput
+          style={styles.searchField}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder="Search by phone, name, or flat no"
+          placeholderTextColor={colors.muted}
+        />
+
         {loading ? (
           <ActivityIndicator color={colors.peachPrimary} style={{ marginTop: spacing.xl }} />
-        ) : customers.length === 0 ? (
-          <Text style={styles.empty}>No customers yet.</Text>
+        ) : filteredCustomers.length === 0 ? (
+          <Text style={styles.empty}>No customers match this search.</Text>
         ) : (
           <ScrollView style={styles.listScroll} showsVerticalScrollIndicator={false}>
             {sections.map((section) => (
@@ -283,22 +416,24 @@ export const CustomerManagementScreen: React.FC = () => {
             <Text style={styles.modalTitle}>Add Customer</Text>
 
             <Text style={styles.fieldLabel}>Full Name</Text>
-            <TextInput
+            <SanitizedTextInput
               style={styles.field}
               value={newFullName}
               onChangeText={setNewFullName}
+              sanitize={sanitizeNameInput}
               placeholder="Priya Menon"
               placeholderTextColor={colors.muted}
             />
 
             <Text style={styles.fieldLabel}>Phone Number</Text>
-            <TextInput
+            <SanitizedTextInput
               style={styles.field}
               value={newPhoneNumber}
               onChangeText={setNewPhoneNumber}
-              placeholder="+919xxxxxxxxx"
+              sanitize={sanitizePhoneInput}
+              placeholder="9876543210"
               placeholderTextColor={colors.muted}
-              keyboardType="phone-pad"
+              keyboardType="number-pad"
             />
 
             <Text style={styles.fieldLabel}>Location (flat / house / shop no.)</Text>
@@ -360,6 +495,36 @@ export const CustomerManagementScreen: React.FC = () => {
             <Text style={styles.modalSubtitle}>
               {editing?.locationLabel} · {editing?.branch.branchName}
             </Text>
+
+            <Text style={styles.fieldLabel}>Full Name</Text>
+            <SanitizedTextInput
+              style={styles.field}
+              value={editFullName}
+              onChangeText={setEditFullName}
+              sanitize={sanitizeNameInput}
+              placeholder="Priya Menon"
+              placeholderTextColor={colors.muted}
+            />
+
+            <Text style={styles.fieldLabel}>Phone Number</Text>
+            <SanitizedTextInput
+              style={styles.field}
+              value={editPhoneNumber}
+              onChangeText={setEditPhoneNumber}
+              sanitize={sanitizePhoneInput}
+              placeholder="9876543210"
+              placeholderTextColor={colors.muted}
+              keyboardType="number-pad"
+            />
+
+            <Text style={styles.fieldLabel}>Flat / House / Shop No.</Text>
+            <TextInput
+              style={styles.field}
+              value={editLocationLabel}
+              onChangeText={setEditLocationLabel}
+              placeholder="A-304"
+              placeholderTextColor={colors.muted}
+            />
 
             <Text style={styles.fieldLabel}>Billing Mode</Text>
             <View style={styles.toggleRow}>
@@ -453,8 +618,12 @@ export const CustomerManagementScreen: React.FC = () => {
 
             {error && <Text style={styles.error}>{error}</Text>}
 
-            <Pressable style={[styles.saveButton, saving && styles.saveButtonDisabled]} onPress={handleSave} disabled={saving}>
-              {saving ? <ActivityIndicator color={colors.white} /> : <Text style={styles.saveButtonText}>Save</Text>}
+            <Pressable style={[styles.saveButton, saving && styles.saveButtonDisabled]} onPress={handleUpdateCustomer} disabled={saving}>
+              {saving ? <ActivityIndicator color={colors.white} /> : <Text style={styles.saveButtonText}>Save Customer</Text>}
+            </Pressable>
+
+            <Pressable style={styles.deleteButton} onPress={handleDeleteCustomer} disabled={saving}>
+              <Text style={styles.deleteButtonText}>Delete Customer</Text>
             </Pressable>
 
             <Pressable style={styles.cancelButton} onPress={() => setEditing(null)}>
@@ -517,6 +686,17 @@ const createStyles = (colors: ColorTokens) =>
     listScroll: {
       flex: 1,
       minHeight: 0,
+    },
+    searchField: {
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: radii.md,
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.md,
+      fontSize: 12,
+      color: colors.navyText,
+      marginBottom: spacing.sm,
     },
     addButton: {
       backgroundColor: colors.peachPrimary,
@@ -700,6 +880,15 @@ const createStyles = (colors: ColorTokens) =>
       color: colors.white,
       fontWeight: '700',
       fontSize: 12,
+    },
+    deleteButton: {
+      alignItems: 'center',
+      paddingVertical: spacing.md,
+    },
+    deleteButtonText: {
+      color: colors.danger,
+      fontWeight: '700',
+      fontSize: 11,
     },
     cancelButton: {
       alignItems: 'center',
