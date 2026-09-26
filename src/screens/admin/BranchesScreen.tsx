@@ -117,15 +117,8 @@ export const BranchesScreen: React.FC = () => {
   return (
     <AppScreen scroll={false}>
       <View style={styles.appbar}>
-        <View style={styles.appbarTopRow}>
-          <View>
-            <Text style={styles.title}>Branches</Text>
-            <Text style={styles.subtitle}>{branches.length} active · Apartment or Area</Text>
-          </View>
-          <Pressable style={styles.settingsButton} onPress={() => navigation.navigate('Settings')}>
-            <Text style={styles.settingsButtonText}>⚙</Text>
-          </Pressable>
-        </View>
+        <Text style={styles.title}>Branches</Text>
+        <Text style={styles.subtitle}>{branches.length} active · Apartment or Area</Text>
       </View>
 
       <View style={styles.body}>

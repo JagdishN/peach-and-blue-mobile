@@ -70,9 +70,6 @@ export const StaffHomeScreen: React.FC = () => {
           </View>
           <View style={styles.appbarActions}>
             <ThemeToggle />
-            <Pressable style={styles.settingsButton} onPress={() => navigation.navigate('Settings')}>
-              <Text style={styles.settingsButtonText}>⚙</Text>
-            </Pressable>
           </View>
         </View>
         {branch && (
@@ -138,18 +135,6 @@ const createStyles = (colors: ColorTokens) =>
       flexDirection: 'row',
       alignItems: 'center',
       gap: spacing.sm,
-    },
-    settingsButton: {
-      width: 28,
-      height: 28,
-      borderRadius: radii.pill,
-      backgroundColor: 'rgba(255,255,255,0.12)',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    settingsButtonText: {
-      fontSize: 14,
-      color: colors.cream,
     },
     title: {
       fontFamily: fonts.headingSemiBold,

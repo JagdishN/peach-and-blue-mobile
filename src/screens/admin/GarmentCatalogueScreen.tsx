@@ -153,15 +153,8 @@ export const GarmentCatalogueScreen: React.FC = () => {
   return (
     <AppScreen scroll={false}>
       <View style={styles.appbar}>
-        <View style={styles.appbarTopRow}>
-          <View>
-            <Text style={styles.title}>Garment Catalogue</Text>
-            <Text style={styles.subtitle}>{garments.length} items · Editable by Admin only</Text>
-          </View>
-          <Pressable style={styles.settingsButton} onPress={() => navigation.navigate('Settings')}>
-            <Text style={styles.settingsButtonText}>⚙</Text>
-          </Pressable>
-        </View>
+        <Text style={styles.title}>Garment Catalogue</Text>
+        <Text style={styles.subtitle}>{garments.length} items · Editable by Admin only</Text>
       </View>
 
       <View style={styles.body}>

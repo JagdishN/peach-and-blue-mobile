@@ -1,6 +1,7 @@
 import React from 'react';
-import { ScrollView, StyleSheet, View, ViewStyle } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
 import { NivenxaFooter } from './BrandComponents';
 
@@ -15,12 +16,25 @@ interface AppScreenProps {
 // wrapper so the NIVENXA footer (CLAUDE.md non-negotiable) is a structural
 // guarantee rather than something to remember per-screen.
 export const AppScreen: React.FC<AppScreenProps> = ({ children, scroll = true, backgroundColor, contentStyle }) => {
+  const navigation = useNavigation<any>();
+  const route = useRoute<any>();
   const { colors } = useTheme();
   const resolvedBackgroundColor = backgroundColor ?? colors.peachBg;
   const Body = scroll ? ScrollView : View;
+  const isSettingsScreen = route.name === 'Settings';
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: resolvedBackgroundColor }]} edges={['top', 'left', 'right']}>
+      {!isSettingsScreen && (
+        <Pressable
+          accessibilityRole="button"
+          style={styles.globalSettingsButton}
+          onPress={() => navigation.navigate('Settings')}
+          hitSlop={8}
+        >
+          <Text style={styles.globalSettingsButtonText}>⚙</Text>
+        </Pressable>
+      )}
       <Body style={styles.body} contentContainerStyle={scroll ? [styles.content, contentStyle] : undefined}>
         {scroll ? children : <View style={[styles.content, contentStyle]}>{children}</View>}
       </Body>
@@ -48,5 +62,23 @@ const styles = StyleSheet.create({
     padding: 14,
     flexGrow: 1,
     minHeight: 0,
+  },
+  globalSettingsButton: {
+    position: 'absolute',
+    top: 16,
+    right: 14,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(16, 24, 40, 0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+    elevation: 4,
+  },
+  globalSettingsButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#fff',
   },
 });

@@ -134,15 +134,8 @@ export const StaffManagementScreen: React.FC = () => {
   return (
     <AppScreen scroll={false}>
       <View style={styles.appbar}>
-        <View style={styles.appbarTopRow}>
-          <View>
-            <Text style={styles.title}>Staff & Admin Accounts</Text>
-            <Text style={styles.subtitle}>{users.length} total · Admin-only, no passwords (OTP login)</Text>
-          </View>
-          <Pressable style={styles.settingsButton} onPress={() => navigation.navigate('Settings')}>
-            <Text style={styles.settingsButtonText}>⚙</Text>
-          </Pressable>
-        </View>
+        <Text style={styles.title}>Staff & Admin Accounts</Text>
+        <Text style={styles.subtitle}>{users.length} total · Admin-only, no passwords (OTP login)</Text>
       </View>
 
       <View style={styles.body}>
