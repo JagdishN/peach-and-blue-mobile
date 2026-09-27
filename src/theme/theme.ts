@@ -117,4 +117,20 @@ export const radii = {
   pill: 100,
 } as const;
 
+// Lightens a placeholder color by rendering it at reduced alpha rather than
+// picking a separate hardcoded gray — stays correct across both light/dark
+// `muted` values instead of drifting from whichever theme wasn't tested.
+// `placeholderTextColor` is the only thing this should feed: it's a distinct
+// TextInput prop from `style.color`, so this never touches text the user has
+// actually typed.
+export const withOpacity = (hex: string, alpha: number): string => {
+  const match = /^#([0-9a-f]{6})$/i.exec(hex);
+  if (!match) return hex;
+  const int = parseInt(match[1], 16);
+  const r = (int >> 16) & 255;
+  const g = (int >> 8) & 255;
+  const b = int & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
 export const theme = { lightColors, darkColors, fonts, spacing, radii };

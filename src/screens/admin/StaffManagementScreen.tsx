@@ -13,7 +13,7 @@ import { ApiError } from '../../api/client';
 import { fetchUsers, createUser, updateUser, deleteUser, StaffUser, UserRole } from '../../api/users';
 import { fetchBranches, Branch } from '../../api/branches';
 import { getDisplayName } from '../../utils/displayName';
-import { ColorTokens, fonts, radii, spacing } from '../../theme/theme';
+import { ColorTokens, fonts, radii, spacing, withOpacity } from '../../theme/theme';
 import type { AdminStackParamList } from '../../navigation/AdminStack';
 
 const UNSCOPED_KEY = '__unscoped__';
@@ -234,8 +234,8 @@ export const StaffManagementScreen: React.FC = () => {
               value={fullName}
               onChangeText={setFullName}
               sanitize={sanitizeNameInput}
-              placeholder="Ramesh Kumar"
-              placeholderTextColor={colors.muted}
+              placeholder="Enter Full Name"
+              placeholderTextColor={withOpacity(colors.muted, 0.5)}
             />
 
             <Text style={styles.fieldLabel}>Phone Number</Text>
@@ -244,8 +244,8 @@ export const StaffManagementScreen: React.FC = () => {
               value={phoneNumber}
               onChangeText={setPhoneNumber}
               sanitize={sanitizePhoneInput}
-              placeholder="9876543210"
-              placeholderTextColor={colors.muted}
+              placeholder="Enter Phone number"
+              placeholderTextColor={withOpacity(colors.muted, 0.5)}
               keyboardType="number-pad"
             />
 

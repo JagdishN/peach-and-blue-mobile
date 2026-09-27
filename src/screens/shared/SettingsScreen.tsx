@@ -8,13 +8,11 @@ import { useTheme } from '../../context/ThemeContext';
 import { ColorTokens, fonts, spacing, radii } from '../../theme/theme';
 
 // Houses the About content CLAUDE.md requires ("Technology by Nivenxa
-// Technologies", a tappable link, on the About page) plus Log Out — previously there was no way to sign out
-// anywhere in the app at all (AuthContext.signOut existed but nothing
-// called it). The light/dark toggle used to live here as a two-button row —
-// moved to a single icon switch directly on the Admin/Staff home app bars
-// instead (components/ThemeToggle.tsx), so flipping the theme doesn't need
-// a trip into Settings. Registered in both AdminStack and StaffStack, same
-// duplication pattern OrderStatusScreen already uses across both.
+// Technologies", a tappable link, on the About page) plus Log Out — previously
+// there was no way to sign out anywhere in the app at all (AuthContext.signOut
+// existed but nothing called it). Registered in both AdminStack and
+// StaffStack, same duplication pattern OrderStatusScreen already uses across
+// both.
 export const SettingsScreen: React.FC = () => {
   const navigation = useNavigation();
   const { signOut } = useAuth();

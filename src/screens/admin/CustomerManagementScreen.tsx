@@ -24,7 +24,7 @@ import {
   Customer,
 } from '../../api/customers';
 import { fetchBranches, Branch } from '../../api/branches';
-import { ColorTokens, fonts, radii, spacing } from '../../theme/theme';
+import { ColorTokens, fonts, radii, spacing, withOpacity } from '../../theme/theme';
 import type { AdminStackParamList } from '../../navigation/AdminStack';
 
 const BILLING_MODE_LABEL: Record<BillingMode, string> = {
@@ -421,8 +421,8 @@ export const CustomerManagementScreen: React.FC = () => {
               value={newFullName}
               onChangeText={setNewFullName}
               sanitize={sanitizeNameInput}
-              placeholder="Priya Menon"
-              placeholderTextColor={colors.muted}
+              placeholder="Enter Full Name"
+              placeholderTextColor={withOpacity(colors.muted, 0.5)}
             />
 
             <Text style={styles.fieldLabel}>Phone Number</Text>
@@ -431,8 +431,8 @@ export const CustomerManagementScreen: React.FC = () => {
               value={newPhoneNumber}
               onChangeText={setNewPhoneNumber}
               sanitize={sanitizePhoneInput}
-              placeholder="9876543210"
-              placeholderTextColor={colors.muted}
+              placeholder="Enter Phone number"
+              placeholderTextColor={withOpacity(colors.muted, 0.5)}
               keyboardType="number-pad"
             />
 
@@ -502,8 +502,8 @@ export const CustomerManagementScreen: React.FC = () => {
               value={editFullName}
               onChangeText={setEditFullName}
               sanitize={sanitizeNameInput}
-              placeholder="Priya Menon"
-              placeholderTextColor={colors.muted}
+              placeholder="Enter Full Name"
+              placeholderTextColor={withOpacity(colors.muted, 0.5)}
             />
 
             <Text style={styles.fieldLabel}>Phone Number</Text>
@@ -512,8 +512,8 @@ export const CustomerManagementScreen: React.FC = () => {
               value={editPhoneNumber}
               onChangeText={setEditPhoneNumber}
               sanitize={sanitizePhoneInput}
-              placeholder="9876543210"
-              placeholderTextColor={colors.muted}
+              placeholder="Enter Phone number"
+              placeholderTextColor={withOpacity(colors.muted, 0.5)}
               keyboardType="number-pad"
             />
 

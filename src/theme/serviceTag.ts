@@ -8,15 +8,12 @@ import { ServiceType } from '../api/garments';
 // not a service tag.
 //
 // A function, not a static object — the pastel chip backgrounds below are
-// deliberately fixed regardless of theme (small self-contained badges, same
-// treatment CLAUDE.md's "chip" pattern uses elsewhere), so their paired
-// foreground text must also stay fixed rather than following the theme-
-// reactive `navy`/`navyText` tokens (which flip to a LIGHT color in dark
-// mode — fine for body text on a surface that also flips, but would go
-// invisible against these chips' fixed light pastel backgrounds). Only
-// `dry_clean` uses theme-reactive colors, matching the same warningBg/warning
-// pairing used elsewhere in the app (e.g. NewOrderEntryScreen's minimum-kg
-// banner) for a consistent "warning" look in both themes.
+// deliberately fixed (small self-contained badges, same treatment CLAUDE.md's
+// "chip" pattern uses elsewhere), so their paired foreground text is fixed
+// too rather than the `navy`/`navyText` tokens, which would go invisible if
+// either ever moved away from a dark value. Only `dry_clean` uses
+// theme-reactive colors, matching the same warningBg/warning pairing used
+// elsewhere in the app (e.g. NewOrderEntryScreen's minimum-kg banner).
 export const getServiceTag = (
   colors: ColorTokens
 ): Record<ServiceType, { label: string; bg: string; color: string }> => ({

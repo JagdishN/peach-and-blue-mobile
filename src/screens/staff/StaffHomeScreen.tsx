@@ -3,7 +3,6 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AppScreen } from '../../components/AppScreen';
-import { ThemeToggle } from '../../components/ThemeToggle';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { fetchBranch, Branch } from '../../api/branches';
@@ -68,9 +67,6 @@ export const StaffHomeScreen: React.FC = () => {
               {user?.fullName ? getDisplayName(user.fullName) : ''} · {orders.length} collected today
             </Text>
           </View>
-          <View style={styles.appbarActions}>
-            <ThemeToggle />
-          </View>
         </View>
         {branch && (
           <View style={styles.branchChip}>
@@ -130,11 +126,6 @@ const createStyles = (colors: ColorTokens) =>
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'flex-start',
-    },
-    appbarActions: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.sm,
     },
     title: {
       fontFamily: fonts.headingSemiBold,

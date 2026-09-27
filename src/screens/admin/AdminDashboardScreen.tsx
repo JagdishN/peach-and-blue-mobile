@@ -4,7 +4,6 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AppScreen } from '../../components/AppScreen';
 import { PriceChip } from '../../components/PriceChip';
-import { ThemeToggle } from '../../components/ThemeToggle';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { fetchBranch, Branch } from '../../api/branches';
@@ -69,9 +68,6 @@ export const AdminDashboardScreen: React.FC = () => {
           <View>
             <Text style={styles.title}>Overview</Text>
             <Text style={styles.subtitle}>Today, {todayLabel()}</Text>
-          </View>
-          <View style={styles.appbarActions}>
-            <ThemeToggle />
           </View>
         </View>
         <View style={styles.branchChip}>
@@ -145,11 +141,6 @@ const createStyles = (colors: ColorTokens) =>
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'flex-start',
-    },
-    appbarActions: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.sm,
     },
     title: {
       fontFamily: fonts.headingSemiBold,

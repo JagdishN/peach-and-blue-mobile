@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View, ViewStyle } from 'react-native';
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View, ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -21,8 +21,13 @@ interface AppScreenProps {
 export const AppScreen: React.FC<AppScreenProps> = ({ children, scroll = true, backgroundColor, contentStyle }) => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
-  const { colors } = useTheme();
-  const { signOut } = useAuth();
+  const { colors, mode, toggleMode } = useTheme();
+  const { state, signOut } = useAuth();
+  const role = state.status === 'signedIn' ? state.user.role : null;
+  // Client ask: a profile/avatar icon instead of a hamburger, distinct per
+  // role so an admin can tell at a glance which account they're in — shield
+  // for elevated (admin) access, plain person for staff.
+  const menuIconName = role === 'admin' ? 'shield-account' : 'account-circle';
   const resolvedBackgroundColor = backgroundColor ?? colors.peachBg;
   const Body = scroll ? ScrollView : View;
   // Hidden on Settings itself (already there) and on Login — 'Settings' isn't
@@ -46,17 +51,17 @@ export const AppScreen: React.FC<AppScreenProps> = ({ children, scroll = true, b
         <>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Menu"
+            accessibilityLabel="Account menu"
             style={styles.globalSettingsButton}
             onPress={() => setMenuOpen(true)}
             hitSlop={8}
           >
-            <MaterialCommunityIcons name="menu" size={18} color="#fff" />
+            <MaterialCommunityIcons name={menuIconName} size={20} color="#fff" />
           </Pressable>
 
           <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
             <Pressable style={styles.menuOverlay} onPress={() => setMenuOpen(false)}>
-              <View style={styles.menuCard}>
+              <View style={[styles.menuCard, { backgroundColor: colors.surface }]}>
                 <Pressable
                   style={styles.menuItem}
                   onPress={() => {
@@ -64,13 +69,33 @@ export const AppScreen: React.FC<AppScreenProps> = ({ children, scroll = true, b
                     navigation.navigate('Settings');
                   }}
                 >
-                  <MaterialCommunityIcons name="information-outline" size={16} color="#17315E" />
-                  <Text style={styles.menuItemText}>About</Text>
+                  <MaterialCommunityIcons name="information-outline" size={16} color={colors.navyText} />
+                  <Text style={[styles.menuItemText, { color: colors.navyText }]}>About</Text>
                 </Pressable>
-                <View style={styles.menuDivider} />
+                <View style={[styles.menuDivider, { backgroundColor: colors.border }]} />
+                {/* Not a Pressable wrapping the Switch — the Switch already
+                    has its own touch target and onValueChange; wrapping it in
+                    an outer onPress too would double-toggle on a single tap. */}
+                <View style={[styles.menuItem, styles.menuItemSpaceBetween]}>
+                  <View style={styles.menuItemInner}>
+                    <MaterialCommunityIcons
+                      name={mode === 'dark' ? 'weather-night' : 'white-balance-sunny'}
+                      size={16}
+                      color={colors.navyText}
+                    />
+                    <Text style={[styles.menuItemText, { color: colors.navyText }]}>Dark Mode</Text>
+                  </View>
+                  <Switch
+                    value={mode === 'dark'}
+                    onValueChange={toggleMode}
+                    trackColor={{ false: colors.border, true: colors.peachPrimary }}
+                    thumbColor={colors.white}
+                  />
+                </View>
+                <View style={[styles.menuDivider, { backgroundColor: colors.border }]} />
                 <Pressable style={styles.menuItem} onPress={handleLogout}>
-                  <MaterialCommunityIcons name="logout" size={16} color="#C24545" />
-                  <Text style={[styles.menuItemText, styles.menuItemTextDanger]}>Log Out</Text>
+                  <MaterialCommunityIcons name="logout" size={16} color={colors.danger} />
+                  <Text style={[styles.menuItemText, { color: colors.danger }]}>Log Out</Text>
                 </Pressable>
               </View>
             </Pressable>
@@ -137,8 +162,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 52,
     right: 14,
-    minWidth: 150,
-    backgroundColor: '#fff',
+    minWidth: 190,
     borderRadius: radii.md,
     paddingVertical: spacing.xs,
     shadowColor: '#000',
@@ -154,20 +178,20 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
   },
+  menuItemSpaceBetween: {
+    justifyContent: 'space-between',
+  },
+  menuItemInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
   menuItemText: {
     fontSize: 12.5,
     fontWeight: '600',
-    color: '#17315E',
-  },
-  menuItemTextDanger: {
-    // Matches theme.ts's `danger` token (#C24545, same in both light/dark) —
-    // this menu's colors are fixed regardless of theme, same as the ⋮ button
-    // and NivenxaFooter, so hardcoded rather than pulled from useTheme().
-    color: '#C24545',
   },
   menuDivider: {
     height: 1,
-    backgroundColor: 'rgba(16, 24, 40, 0.08)',
     marginHorizontal: spacing.sm,
   },
 });

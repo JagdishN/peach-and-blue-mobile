@@ -609,6 +609,8 @@ const createStyles = (colors: ColorTokens) =>
     nameRow: {
       flexDirection: 'row',
       alignItems: 'center',
+      flexWrap: 'wrap',
+      flexShrink: 1,
     },
     garmentIcon: {
       marginRight: spacing.xs,
@@ -617,6 +619,7 @@ const createStyles = (colors: ColorTokens) =>
       fontSize: 11.5,
       fontWeight: '600',
       color: colors.navyText,
+      flexShrink: 1,
     },
     categorySub: {
       fontSize: 9.5,
