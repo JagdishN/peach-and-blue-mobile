@@ -116,7 +116,10 @@ export const StaffManagementScreen: React.FC = () => {
             await deleteUser(staff.id);
             await load();
           } catch (err) {
-            setError(err instanceof ApiError ? err.message : 'Could not delete this account.');
+            // setError alone is silent here — the only place that renders
+            // `error` is inside the Add/Edit modal, which isn't open during
+            // a list-row delete, so a failure looked like nothing happened.
+            Alert.alert('Could not delete', err instanceof ApiError ? err.message : 'Could not delete this account.');
           }
         },
       },
