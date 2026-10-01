@@ -75,15 +75,38 @@ const tryRefreshAccessToken = async (): Promise<boolean> => {
   }
 };
 
+// This had no timeout at all — a hung backend response (e.g. the OTP send
+// request blocking on a hung upstream MSG91 call, see msg91Client.ts) left
+// this fetch pending forever, which left whatever screen's `loading` state
+// spinning forever too (LoginScreen's finally{} never ran because the
+// awaited promise never settled, not because it threw). 30s is generous
+// for a mobile network but guarantees this always settles one way or
+// another.
+const REQUEST_TIMEOUT_MS = 30_000;
+
 export const apiRequest = async <T>(path: string, options: RequestOptions = {}, isRetry = false): Promise<T> => {
-  const response = await fetch(`${API_URL}${path}`, {
-    method: options.method ?? 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-    },
-    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
-  });
+  const abortController = new AbortController();
+  const timeoutId = setTimeout(() => abortController.abort(), REQUEST_TIMEOUT_MS);
+
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}${path}`, {
+      method: options.method ?? 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+      },
+      body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+      signal: abortController.signal,
+    });
+  } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw new ApiError(0, 'Request timed out. Check your connection and try again.');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   // A 401 on an already-authenticated request means the access token
   // expired (it's short-lived by design, CLAUDE.md) — silently exchange the
