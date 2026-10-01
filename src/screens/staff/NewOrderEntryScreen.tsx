@@ -25,6 +25,9 @@ type Nav = NativeStackNavigationProp<StaffStackParamList, 'NewOrderEntry'>;
 const LAUNDRY_MINIMUM_KG = 5;
 const sanitizeNameInput = (value: string) => value.replace(/[^A-Za-z\s.]/g, '').slice(0, 60);
 const sanitizePhoneInput = (value: string) => value.replace(/\D/g, '').slice(0, 10);
+// Free text for the combined phone/flat/name search box below — unlike the
+// two sanitizers above, this one isn't restricted to a single field's shape.
+const sanitizeSearchInput = (value: string) => value.replace(/[^A-Za-z0-9\s./-]/g, '').slice(0, 60);
 
 // Sentinel tab key for "show every service type" — mirrors
 // GarmentCatalogueScreen.tsx's ALL_TAB, kept distinct from any real
@@ -309,7 +312,8 @@ export const NewOrderEntryScreen: React.FC = () => {
           const flat = customer.locationLabel.toLowerCase();
           if (flatDigits.includes(query.toLowerCase()) || flat.includes(query.toLowerCase())) return 0;
           if (customer.phoneNumber.toLowerCase().includes(query.toLowerCase())) return 1;
-          return 2;
+          if (customer.fullName.toLowerCase().includes(query.toLowerCase())) return 2;
+          return 3;
         };
 
         const aPriority = flatPriority(a);
@@ -319,7 +323,12 @@ export const NewOrderEntryScreen: React.FC = () => {
       });
       setSearchResults(ranked);
       if (ranked.length === 0) {
-        setCustomerPhoneNumber(query);
+        // The query could be a phone, a flat no., or a name now — only
+        // carry it into the new-customer phone field when it actually
+        // looks like one (exactly 10 digits); otherwise leave all three
+        // fields below blank for manual entry rather than guessing wrong.
+        const digitsOnly = query.replace(/\D/g, '');
+        setCustomerPhoneNumber(digitsOnly.length === 10 ? digitsOnly : '');
         setCustomerName('');
         setLocationLabel('');
       }
@@ -499,17 +508,16 @@ export const NewOrderEntryScreen: React.FC = () => {
       <View style={styles.body}>
         {!customerConfirmed ? (
           <>
-            <Text style={styles.fieldLabel}>Customer Phone Number</Text>
+            <Text style={styles.fieldLabel}>Phone, Flat No. or Name</Text>
             <View style={styles.phoneSearchRow}>
               <SanitizedTextInput
                 testID="order-phone-search-input"
                 style={[styles.field, styles.phoneSearchInput]}
                 value={phoneQuery}
                 onChangeText={setPhoneQuery}
-                sanitize={sanitizePhoneInput}
-                placeholder="Phone / Flat No"
+                sanitize={sanitizeSearchInput}
+                placeholder="Phone / Flat No. / Name"
                 placeholderTextColor={colors.muted}
-                keyboardType="number-pad"
               />
               <Pressable
                 testID="order-phone-search-button"
@@ -563,6 +571,17 @@ export const NewOrderEntryScreen: React.FC = () => {
                   onChangeText={setLocationLabel}
                   placeholder="A-304"
                   placeholderTextColor={colors.muted}
+                />
+                <Text style={styles.fieldLabel}>Customer Phone Number</Text>
+                <SanitizedTextInput
+                  testID="new-customer-phone-input"
+                  style={styles.field}
+                  value={customerPhoneNumber}
+                  onChangeText={setCustomerPhoneNumber}
+                  sanitize={sanitizePhoneInput}
+                  placeholder="9876543210"
+                  placeholderTextColor={colors.muted}
+                  keyboardType="number-pad"
                 />
                 <Pressable
                   testID="new-customer-confirm-button"
