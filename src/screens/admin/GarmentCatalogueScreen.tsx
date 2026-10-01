@@ -33,7 +33,9 @@ export const GarmentCatalogueScreen: React.FC = () => {
   const serviceTag = useMemo(() => getServiceTag(colors), [colors]);
 
   const [garments, setGarments] = useState<Garment[]>([]);
-  const [activeTab, setActiveTab] = useState<string>(ALL_TAB);
+  // Ironing is the most commonly managed service type — default the tab to
+  // it instead of "All" so the most-used list is what's shown first.
+  const [activeTab, setActiveTab] = useState<string>('ironing');
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Garment | 'new' | null>(null);

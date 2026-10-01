@@ -106,7 +106,7 @@ export const StaffManagementScreen: React.FC = () => {
   };
 
   const handleDelete = async (staff: StaffUser) => {
-    Alert.alert('Delete staff account', `Delete ${staff.fullName}? This cannot be undone.`, [
+    Alert.alert('Delete staff account', `Permanently delete ${staff.fullName}? This cannot be undone.`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
@@ -202,7 +202,6 @@ export const StaffManagementScreen: React.FC = () => {
                           bg={u.role === 'admin' ? colors.warningBg : colors.successBg}
                           color={u.role === 'admin' ? colors.warning : colors.success}
                         />
-                        {!u.isActive && <Tag label="Inactive" bg={colors.border} color={colors.muted} />}
                       </View>
                     </View>
                     <Text style={styles.cardSub}>{u.phoneNumber}</Text>

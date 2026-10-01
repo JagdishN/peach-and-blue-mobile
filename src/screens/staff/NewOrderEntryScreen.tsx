@@ -26,6 +26,11 @@ const LAUNDRY_MINIMUM_KG = 5;
 const sanitizeNameInput = (value: string) => value.replace(/[^A-Za-z\s.]/g, '').slice(0, 60);
 const sanitizePhoneInput = (value: string) => value.replace(/\D/g, '').slice(0, 10);
 
+// Sentinel tab key for "show every service type" — mirrors
+// GarmentCatalogueScreen.tsx's ALL_TAB, kept distinct from any real
+// serviceType string.
+const ALL_TAB = '__all__';
+
 export const NewOrderEntryScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
   const { state } = useAuth();
@@ -103,12 +108,30 @@ export const NewOrderEntryScreen: React.FC = () => {
   // Filters by itemName only (not category/serviceType) — that's the thing
   // staff actually knows the customer said.
   const [garmentQuery, setGarmentQuery] = useState('');
+  // Ironing is staff's most common case (same reasoning as
+  // expandedServices's default above) — default the tab to it instead of
+  // "All" so the most-used list is what's shown first.
+  const [activeTab, setActiveTab] = useState<string>('ironing');
+
+  // Built off the unfiltered garment list so the tab bar itself stays
+  // stable while the user types a search query — same reasoning as
+  // GarmentCatalogueScreen.tsx's serviceTabs.
+  const serviceTabs = useMemo(() => {
+    const present = new Set(garments.map((g) => g.serviceType));
+    return [
+      ...SERVICE_ORDER.filter((key) => present.has(key)),
+      ...Array.from(present).filter((key) => !SERVICE_ORDER.includes(key)).sort(),
+    ];
+  }, [garments]);
 
   const filteredGarments = useMemo(() => {
     const query = garmentQuery.trim().toLowerCase();
-    if (!query) return garments;
-    return garments.filter((g) => g.itemName.toLowerCase().includes(query));
-  }, [garments, garmentQuery]);
+    return garments.filter((g) => {
+      if (activeTab !== ALL_TAB && g.serviceType !== activeTab) return false;
+      if (!query) return true;
+      return g.itemName.toLowerCase().includes(query);
+    });
+  }, [garments, garmentQuery, activeTab]);
 
   const groupedByService = useMemo(() => {
     const serviceGroups = new Map<string, Garment[]>();
@@ -600,6 +623,46 @@ export const NewOrderEntryScreen: React.FC = () => {
               placeholderTextColor={colors.muted}
             />
 
+            {/* Sticky/frozen by construction, same as GarmentCatalogueScreen —
+                this row lives in `body` above `garmentScroll` below, not
+                inside it, so it never scrolls away with the list. */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.tabRow}
+              contentContainerStyle={styles.tabRowContent}
+            >
+              <Pressable
+                style={[styles.tabChip, activeTab === ALL_TAB && styles.tabChipActive]}
+                onPress={() => setActiveTab(ALL_TAB)}
+              >
+                <Text style={[styles.tabChipText, activeTab === ALL_TAB && styles.tabChipTextActive]}>All</Text>
+                <MaterialCommunityIcons
+                  name={activeTab === ALL_TAB ? 'chevron-down' : 'chevron-right'}
+                  size={14}
+                  color={activeTab === ALL_TAB ? colors.white : colors.muted}
+                  style={styles.tabChipIcon}
+                />
+              </Pressable>
+              {serviceTabs.map((type) => (
+                <Pressable
+                  key={type}
+                  style={[styles.tabChip, activeTab === type && styles.tabChipActive]}
+                  onPress={() => setActiveTab(type)}
+                >
+                  <Text style={[styles.tabChipText, activeTab === type && styles.tabChipTextActive]}>
+                    {serviceTag[type]?.label ?? type}
+                  </Text>
+                  <MaterialCommunityIcons
+                    name={activeTab === type ? 'chevron-down' : 'chevron-right'}
+                    size={14}
+                    color={activeTab === type ? colors.white : colors.muted}
+                    style={styles.tabChipIcon}
+                  />
+                </Pressable>
+              ))}
+            </ScrollView>
+
             {loading ? (
               <ActivityIndicator color={colors.peachPrimary} style={{ marginTop: spacing.lg }} />
             ) : (
@@ -609,12 +672,16 @@ export const NewOrderEntryScreen: React.FC = () => {
                 )}
 
                 {groupedByService.map(({ serviceType, categories }) => {
-                  // While actively searching, every matching section is
+                  // While actively searching, or while a single tab is
+                  // selected above (only one section can appear at all,
+                  // same as GarmentCatalogueScreen not needing an accordion
+                  // once filtered to one tab), every matching section is
                   // shown open regardless of its collapsed/expanded state —
                   // staff shouldn't have to also expand a section by hand to
                   // see why it matched.
                   const searching = garmentQuery.trim() !== '';
-                  const expanded = searching || (expandedServices[serviceType] ?? false);
+                  const tabFiltered = activeTab !== ALL_TAB;
+                  const expanded = searching || tabFiltered || (expandedServices[serviceType] ?? false);
                   const itemCount = categories.reduce((sum, [, items]) => sum + items.length, 0);
                   const tag = serviceTag[serviceType] ?? { label: serviceType, bg: colors.peachCard, color: colors.navyText };
 
@@ -623,13 +690,13 @@ export const NewOrderEntryScreen: React.FC = () => {
                       <Pressable
                         style={styles.serviceHeader}
                         onPress={() => toggleService(serviceType)}
-                        disabled={searching}
+                        disabled={searching || tabFiltered}
                       >
                         <View style={styles.serviceHeaderLeft}>
                           <Text style={styles.serviceHeaderTitle}>{tag.label}</Text>
                           <Text style={styles.serviceHeaderCount}>{itemCount} items</Text>
                         </View>
-                        {!searching && (
+                        {!searching && !tabFiltered && (
                           <MaterialCommunityIcons
                             name={expanded ? 'chevron-up' : 'chevron-down'}
                             size={20}
@@ -835,6 +902,40 @@ const createStyles = (colors: ColorTokens) =>
       color: colors.navyText,
       marginTop: spacing.sm,
       marginBottom: spacing.sm,
+    },
+    tabRow: {
+      flexGrow: 0,
+      marginBottom: spacing.sm,
+    },
+    tabRowContent: {
+      flexDirection: 'row',
+      gap: spacing.xs,
+      paddingRight: spacing.xs,
+    },
+    tabChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: spacing.xs,
+      paddingHorizontal: spacing.sm,
+      borderRadius: radii.pill,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+    },
+    tabChipActive: {
+      backgroundColor: colors.peachPrimary,
+      borderColor: colors.peachPrimary,
+    },
+    tabChipText: {
+      fontSize: 10.5,
+      fontWeight: '700',
+      color: colors.navyText,
+    },
+    tabChipTextActive: {
+      color: colors.white,
+    },
+    tabChipIcon: {
+      marginLeft: 2,
     },
     garmentScroll: {
       flex: 1,
