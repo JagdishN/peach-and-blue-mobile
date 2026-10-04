@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, ScrollView, SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -94,21 +94,28 @@ export const GarmentCatalogueScreen: React.FC = () => {
     });
   }, [garments, searchQuery, activeTab]);
 
-  const groupedByService = useMemo(() => {
-    const serviceGroups = new Map<string, Garment[]>();
+  // Client ask: sub-group by category (Men's/Women's/Kids Wear, Household,
+  // etc.) with the sub-group headers frozen while scrolling, same as the
+  // service-type tabs above are frozen. SectionList gives this natively via
+  // stickySectionHeadersEnabled. Grouped by (serviceType, category) — not
+  // category alone — because "Laundry Services (Per KG)" is a real category
+  // name reused by both wash_fold and dry_clean; grouping by category alone
+  // would wrongly merge those two unrelated items into one section whenever
+  // "All" is the active tab. Every other category string already encodes
+  // its tier in the text itself (e.g. "Dry Cleaning — Men's Wear" vs "Iron
+  // Services — Men's Wear"), so the section title only needs the category.
+  const categorySections = useMemo(() => {
+    const groups = new Map<string, { title: string; serviceType: string; garments: Garment[] }>();
     for (const garment of filteredGarments) {
-      if (!serviceGroups.has(garment.serviceType)) serviceGroups.set(garment.serviceType, []);
-      serviceGroups.get(garment.serviceType)!.push(garment);
+      const category = garment.category ?? 'Other';
+      const key = `${garment.serviceType}::${category}`;
+      if (!groups.has(key)) groups.set(key, { title: category, serviceType: garment.serviceType, garments: [] });
+      groups.get(key)!.garments.push(garment);
     }
-
-    const orderedKeys = [
-      ...SERVICE_ORDER.filter((key) => serviceGroups.has(key)),
-      ...Array.from(serviceGroups.keys()).filter((key) => !SERVICE_ORDER.includes(key)).sort(),
-    ];
-
-    return orderedKeys.map((serviceType) => ({
-      serviceType,
-      garments: serviceGroups.get(serviceType) ?? [],
+    return Array.from(groups.values()).map((group) => ({
+      title: group.title,
+      serviceType: group.serviceType,
+      data: group.garments,
     }));
   }, [filteredGarments]);
 
@@ -260,49 +267,49 @@ export const GarmentCatalogueScreen: React.FC = () => {
 
         {loading ? (
           <ActivityIndicator color={colors.peachPrimary} style={{ marginTop: spacing.xl }} />
+        ) : categorySections.length === 0 ? (
+          <Text style={styles.empty}>No garments match this search.</Text>
         ) : (
-          <ScrollView style={styles.listScroll} showsVerticalScrollIndicator={false}>
-            {groupedByService.length === 0 ? (
-              <Text style={styles.empty}>No garments match this search.</Text>
-            ) : (
-              groupedByService.map(({ serviceType, garments: serviceGarments }) => (
-                <View key={serviceType} style={styles.serviceBlock}>
-                  {/* Redundant once a single service tab is active — the tab
-                      chip above already names it. */}
-                  {activeTab === ALL_TAB && (
-                    <Text style={styles.sectionHeader}>{serviceTag[serviceType]?.label ?? serviceType}</Text>
-                  )}
-                  {serviceGarments.map((garment) => (
-                    <Pressable key={garment.id} style={styles.card} onPress={() => openEdit(garment)}>
-                      <View style={styles.cardRow}>
-                        <View style={styles.nameRow}>
-                          <MaterialCommunityIcons
-                            name={(garment.iconKey ?? 'hanger') as any}
-                            size={16}
-                            color={colors.muted}
-                            style={styles.garmentIcon}
-                          />
-                          <Text style={styles.garmentName}>{garment.itemName}</Text>
-                          <Tag
-                            {...(serviceTag[garment.serviceType] ?? {
-                              label: garment.serviceType,
-                              bg: colors.peachCard,
-                              color: colors.navyText,
-                            })}
-                          />
-                          {garment.requiresSpecialCare && <Tag {...SPECIAL_CARE_TAG} />}
-                        </View>
-                        <PriceChip amount={Number(garment.price)} variant="navy" />
-                      </View>
-                      {garment.category && <Text style={styles.categorySub}>{garment.category}</Text>}
-                      {garment.pricingUnit === 'per_kg' && <Text style={styles.categorySub}>Priced per kg</Text>}
-                      {garment.isStartingPrice && <Text style={styles.categorySub}>Starting price (onwards)</Text>}
-                    </Pressable>
-                  ))}
-                </View>
-              ))
+          // Client ask: category sub-group headers (Men's/Women's/Kids Wear,
+          // Household, etc.) frozen while scrolling — stickySectionHeadersEnabled
+          // is exactly this, same idea as the service-type tab row above being
+          // frozen by living outside the scroll area.
+          <SectionList
+            style={styles.listScroll}
+            showsVerticalScrollIndicator={false}
+            sections={categorySections}
+            keyExtractor={(garment) => garment.id}
+            stickySectionHeadersEnabled
+            renderSectionHeader={({ section }) => (
+              <Text style={styles.sectionHeader}>{section.title}</Text>
             )}
-          </ScrollView>
+            renderItem={({ item: garment }) => (
+              <Pressable style={styles.card} onPress={() => openEdit(garment)}>
+                <View style={styles.cardRow}>
+                  <View style={styles.nameRow}>
+                    <MaterialCommunityIcons
+                      name={(garment.iconKey ?? 'hanger') as any}
+                      size={16}
+                      color={colors.muted}
+                      style={styles.garmentIcon}
+                    />
+                    <Text style={styles.garmentName}>{garment.itemName}</Text>
+                    <Tag
+                      {...(serviceTag[garment.serviceType] ?? {
+                        label: garment.serviceType,
+                        bg: colors.peachCard,
+                        color: colors.navyText,
+                      })}
+                    />
+                    {garment.requiresSpecialCare && <Tag {...SPECIAL_CARE_TAG} />}
+                  </View>
+                  <PriceChip amount={Number(garment.price)} variant="navy" />
+                </View>
+                {garment.pricingUnit === 'per_kg' && <Text style={styles.categorySub}>Priced per kg</Text>}
+                {garment.isStartingPrice && <Text style={styles.categorySub}>Starting price (onwards)</Text>}
+              </Pressable>
+            )}
+          />
         )}
 
         <Pressable style={styles.addButton} onPress={openNew}>
@@ -577,16 +584,18 @@ const createStyles = (colors: ColorTokens) =>
     tabChipIcon: {
       marginLeft: 2,
     },
-    serviceBlock: {
-      marginBottom: spacing.sm,
-    },
+    // Opaque background is required, not cosmetic — this header is sticky
+    // (stickySectionHeadersEnabled) and sits on top of scrolling cards
+    // beneath it; a transparent background would let card content show
+    // through underneath it while stuck.
     sectionHeader: {
       fontSize: 10.5,
       fontWeight: '800',
       textTransform: 'uppercase',
       letterSpacing: 0.4,
       color: colors.muted,
-      marginBottom: spacing.xs,
+      backgroundColor: colors.peachBg,
+      paddingVertical: spacing.xs,
       marginTop: spacing.sm,
     },
     empty: {

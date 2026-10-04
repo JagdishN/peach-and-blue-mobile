@@ -1,5 +1,5 @@
  import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -99,20 +99,17 @@ export const NewOrderEntryScreen: React.FC = () => {
   }, []);
 
   // CLAUDE.md "Garment picker restructuring — service-type as parent" —
-  // serviceType is now the top-level, expandable grouping (categories nest
-  // underneath, same as before), with Ironing default-expanded since it's
-  // staff's most common case. SERVICE_ORDER fixes the display order; any
-  // future serviceType not in this list is appended alphabetically rather
-  // than silently dropped.
+  // serviceType is the top-level grouping, picked via the tab row below
+  // (Ironing default-active since it's staff's most common case).
+  // SERVICE_ORDER fixes the display order; any future serviceType not in
+  // this list is appended alphabetically rather than silently dropped.
   const SERVICE_ORDER = ['ironing', 'wash_fold', 'dry_clean'];
-  const [expandedServices, setExpandedServices] = useState<Record<string, boolean>>({ ironing: true });
   // CLAUDE.md "Iron-only tier reintroduced" flagged this: the catalogue grew
   // to 192 items with no way to jump straight to one during a live pickup.
   // Filters by itemName only (not category/serviceType) — that's the thing
   // staff actually knows the customer said.
   const [garmentQuery, setGarmentQuery] = useState('');
-  // Ironing is staff's most common case (same reasoning as
-  // expandedServices's default above) — default the tab to it instead of
+  // Ironing is staff's most common case — default the tab to it instead of
   // "All" so the most-used list is what's shown first.
   const [activeTab, setActiveTab] = useState<string>('ironing');
 
@@ -136,32 +133,28 @@ export const NewOrderEntryScreen: React.FC = () => {
     });
   }, [garments, garmentQuery, activeTab]);
 
-  const groupedByService = useMemo(() => {
-    const serviceGroups = new Map<string, Garment[]>();
+  // Client ask: sub-group by category (Men's/Women's/Kids Wear, Household,
+  // etc.) with the sub-group headers frozen while scrolling, same as the
+  // service-type tabs above are frozen — mirrors GarmentCatalogueScreen.tsx's
+  // categorySections. Grouped by (serviceType, category), not category
+  // alone, for the same reason as there: "Laundry Services (Per KG)" is a
+  // real category name reused by both wash_fold and dry_clean, so grouping
+  // by category text alone would wrongly merge those two unrelated items
+  // whenever the "All" tab is active.
+  const categorySections = useMemo(() => {
+    const groups = new Map<string, { title: string; serviceType: string; garments: Garment[] }>();
     for (const garment of filteredGarments) {
-      if (!serviceGroups.has(garment.serviceType)) serviceGroups.set(garment.serviceType, []);
-      serviceGroups.get(garment.serviceType)!.push(garment);
+      const category = garment.category ?? 'Other';
+      const key = `${garment.serviceType}::${category}`;
+      if (!groups.has(key)) groups.set(key, { title: category, serviceType: garment.serviceType, garments: [] });
+      groups.get(key)!.garments.push(garment);
     }
-
-    const orderedKeys = [
-      ...SERVICE_ORDER.filter((key) => serviceGroups.has(key)),
-      ...Array.from(serviceGroups.keys()).filter((key) => !SERVICE_ORDER.includes(key)).sort(),
-    ];
-
-    return orderedKeys.map((serviceType) => {
-      const categoryGroups = new Map<string, Garment[]>();
-      for (const garment of serviceGroups.get(serviceType)!) {
-        const key = garment.category ?? 'Other';
-        if (!categoryGroups.has(key)) categoryGroups.set(key, []);
-        categoryGroups.get(key)!.push(garment);
-      }
-      return { serviceType, categories: Array.from(categoryGroups.entries()) };
-    });
+    return Array.from(groups.values()).map((group) => ({
+      title: group.title,
+      serviceType: group.serviceType,
+      data: group.garments,
+    }));
   }, [filteredGarments]);
-
-  const toggleService = (serviceType: string) => {
-    setExpandedServices((prev) => ({ ...prev, [serviceType]: !prev[serviceType] }));
-  };
 
   const adjustQuantity = (garmentId: string, delta: number) => {
     setQuantities((prev) => {
@@ -684,59 +677,27 @@ export const NewOrderEntryScreen: React.FC = () => {
 
             {loading ? (
               <ActivityIndicator color={colors.peachPrimary} style={{ marginTop: spacing.lg }} />
+            ) : categorySections.length === 0 ? (
+              garmentQuery.trim() !== '' && (
+                <Text style={styles.noResultsText}>No garments match "{garmentQuery.trim()}".</Text>
+              )
             ) : (
-              <ScrollView style={styles.garmentScroll} showsVerticalScrollIndicator={false}>
-                {groupedByService.length === 0 && garmentQuery.trim() !== '' && (
-                  <Text style={styles.noResultsText}>No garments match "{garmentQuery.trim()}".</Text>
+              // Client ask: category sub-group headers (Men's/Women's/Kids
+              // Wear, Household, etc.) frozen while scrolling — mirrors
+              // GarmentCatalogueScreen.tsx's SectionList.
+              <SectionList
+                style={styles.garmentScroll}
+                showsVerticalScrollIndicator={false}
+                sections={categorySections}
+                keyExtractor={(garment) => garment.id}
+                stickySectionHeadersEnabled
+                renderSectionHeader={({ section }) => (
+                  <Text style={styles.categoryHeader}>{section.title}</Text>
                 )}
-
-                {groupedByService.map(({ serviceType, categories }) => {
-                  // While actively searching, or while a single tab is
-                  // selected above (only one section can appear at all,
-                  // same as GarmentCatalogueScreen not needing an accordion
-                  // once filtered to one tab), every matching section is
-                  // shown open regardless of its collapsed/expanded state —
-                  // staff shouldn't have to also expand a section by hand to
-                  // see why it matched.
-                  const searching = garmentQuery.trim() !== '';
-                  const tabFiltered = activeTab !== ALL_TAB;
-                  const expanded = searching || tabFiltered || (expandedServices[serviceType] ?? false);
-                  const itemCount = categories.reduce((sum, [, items]) => sum + items.length, 0);
-                  const tag = serviceTag[serviceType] ?? { label: serviceType, bg: colors.peachCard, color: colors.navyText };
-
-                  return (
-                    <View key={serviceType} style={styles.serviceBlock}>
-                      <Pressable
-                        style={styles.serviceHeader}
-                        onPress={() => toggleService(serviceType)}
-                        disabled={searching || tabFiltered}
-                      >
-                        <View style={styles.serviceHeaderLeft}>
-                          <Text style={styles.serviceHeaderTitle}>{tag.label}</Text>
-                          <Text style={styles.serviceHeaderCount}>{itemCount} items</Text>
-                        </View>
-                        {!searching && !tabFiltered && (
-                          <MaterialCommunityIcons
-                            name={expanded ? 'chevron-up' : 'chevron-down'}
-                            size={20}
-                            color={colors.navyText}
-                          />
-                        )}
-                      </Pressable>
-
-                      {expanded &&
-                        categories.map(([category, items]) => (
-                          <View key={category} style={styles.categoryBlock}>
-                            <Text style={styles.categoryHeader}>{category}</Text>
-                            <View style={styles.garmentCard}>
-                              {items.map((garment, index) => renderGarmentRow(garment, index === items.length - 1))}
-                            </View>
-                          </View>
-                        ))}
-                    </View>
-                  );
-                })}
-              </ScrollView>
+                renderItem={({ item: garment, index, section }) =>
+                  renderGarmentRow(garment, index === section.data.length - 1)
+                }
+              />
             )}
 
             {totalPerKgWeight > 0 && totalPerKgWeight < LAUNDRY_MINIMUM_KG && (
@@ -966,62 +927,36 @@ const createStyles = (colors: ColorTokens) =>
       textAlign: 'center',
       marginTop: spacing.lg,
     },
-    serviceBlock: {
-      marginBottom: spacing.sm,
-    },
-    serviceHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      backgroundColor: colors.chrome,
-      borderRadius: radii.md,
-      paddingVertical: spacing.sm,
-      paddingHorizontal: spacing.md,
-      marginBottom: spacing.xs,
-    },
-    serviceHeaderLeft: {
-      flexDirection: 'row',
-      alignItems: 'baseline',
-      gap: spacing.xs,
-    },
-    serviceHeaderTitle: {
-      fontSize: 12.5,
-      fontWeight: '700',
-      color: colors.cream,
-    },
-    serviceHeaderCount: {
-      fontSize: 10,
-      color: '#C8A67B',
-    },
-    categoryBlock: {
-      marginBottom: spacing.md,
-    },
+    // Opaque background is required, not cosmetic — this header is sticky
+    // (stickySectionHeadersEnabled) and sits on top of scrolling rows
+    // beneath it, same as GarmentCatalogueScreen.tsx's sectionHeader.
     categoryHeader: {
       fontSize: 10.5,
       fontWeight: '800',
       color: colors.muted,
       textTransform: 'uppercase',
       letterSpacing: 0.4,
-      marginBottom: spacing.xs,
+      backgroundColor: colors.peachBg,
+      paddingVertical: spacing.xs,
     },
-    garmentCard: {
-      backgroundColor: colors.peachCard,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: radii.lg,
-      padding: 13,
-    },
+    // Each row is now its own card (SectionList gives one row per item, not
+    // one shared container per category) — same per-item card look as
+    // GarmentCatalogueScreen.tsx's `card`, rather than the old dashed
+    // separator-inside-one-big-card look.
     garmentRow: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
+      backgroundColor: colors.peachCard,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: radii.lg,
       paddingVertical: 9,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-      borderStyle: 'dashed',
+      paddingHorizontal: 13,
+      marginBottom: spacing.sm,
     },
     garmentRowLast: {
-      borderBottomWidth: 0,
+      marginBottom: spacing.md,
     },
     garmentInfo: {
       flexShrink: 1,
