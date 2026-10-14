@@ -11,6 +11,7 @@ import {
   reviseOrderAmount,
   assignOrderStaff,
   Order,
+  OrderItem,
   InternalStatus,
   PaymentMethod,
 } from '../../api/orders';
@@ -33,12 +34,21 @@ const stageIndexForStatus = (status: InternalStatus): number => {
 };
 
 const nextStatusLabel: Partial<Record<InternalStatus, string>> = {
-  picked_up: 'Washing',
+  picked_up: 'Processing',
   washing: 'Ironing',
   ironing: 'Ready',
   ready: 'Out for Delivery',
   out_for_delivery: 'Delivered',
 };
+
+// Client ask (2026-10-14): Dry Cleaning and Wash & Fold take noticeably
+// longer than Ironing — mirrors invoiceService.ts's getTurnaroundText on the
+// backend (same wording, computed client-side here since this screen
+// already has order.orderItems in hand).
+const getTurnaroundText = (items: OrderItem[]): string =>
+  items.some((item) => item.serviceType === 'wash_fold' || item.serviceType === 'dry_clean')
+    ? 'Dry Cleaning and Wash & Fold — expected delivery in 4 to 5 business working days.'
+    : 'Turnaround time is typically 24–48 hours from pickup.';
 
 // CLAUDE.md "Payment marking — real gap": the four confirmed payment modes,
 // bundled into the same "mark Delivered" action for daily customers —
@@ -230,6 +240,8 @@ export const OrderStatusScreen: React.FC = () => {
             </Text>
           ))}
         </View>
+
+        <Text style={styles.hint}>{getTurnaroundText(order.orderItems)}</Text>
 
         {order.paymentStatus === 'paid' && (
           <Text style={styles.hint}>

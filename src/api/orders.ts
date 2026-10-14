@@ -13,6 +13,10 @@ export interface OrderItem {
   id: string;
   garmentId: string;
   itemName: string;
+  // Off the linked GarmentCatalogue row, not OrderItem itself — lets the
+  // Order Status screen show a service-aware delivery estimate (Dry
+  // Clean/Wash & Fold takes longer than Ironing).
+  serviceType: string;
   quantity: number | null;
   unitPrice: string | null;
   weightKg: string | null;

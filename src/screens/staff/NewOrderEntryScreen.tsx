@@ -962,9 +962,16 @@ const createStyles = (colors: ColorTokens) =>
       flexShrink: 1,
       paddingRight: spacing.sm,
     },
+    // flexWrap + garmentName's flexShrink are required, not cosmetic — on a
+    // narrow screen, a long item name + its service tag would otherwise
+    // overflow past garmentInfo's right edge and sit on top of the
+    // quantity stepper instead of wrapping to a second line (same bug
+    // fixed earlier in GarmentCatalogueScreen.tsx's nameRow, never applied
+    // here).
     garmentNameRow: {
       flexDirection: 'row',
       alignItems: 'center',
+      flexWrap: 'wrap',
     },
     garmentIcon: {
       marginRight: spacing.xs,
@@ -973,6 +980,7 @@ const createStyles = (colors: ColorTokens) =>
       fontSize: 11.5,
       fontWeight: '600',
       color: colors.navyText,
+      flexShrink: 1,
     },
     garmentPrice: {
       fontSize: 10.5,
