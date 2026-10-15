@@ -134,7 +134,7 @@ const createStyles = (colors: ColorTokens) =>
       color: colors.cream,
     },
     subtitle: {
-      fontSize: 10,
+      fontSize: 12,
       color: '#C8A67B',
       marginTop: 2,
     },
@@ -149,7 +149,7 @@ const createStyles = (colors: ColorTokens) =>
       marginTop: spacing.sm,
     },
     branchChipText: {
-      fontSize: 8.5,
+      fontSize: 10.5,
       fontWeight: '700',
       color: colors.cream,
     },
@@ -179,17 +179,17 @@ const createStyles = (colors: ColorTokens) =>
       alignItems: 'center',
     },
     cardTitle: {
-      fontSize: 12.5,
+      fontSize: 13.5,
       fontWeight: '700',
       color: colors.navyText,
     },
     cardSub: {
-      fontSize: 10.5,
+      fontSize: 12,
       color: colors.muted,
       marginTop: 2,
     },
     badge: {
-      fontSize: 8.5,
+      fontSize: 10,
       fontWeight: '800',
       paddingVertical: 2,
       paddingHorizontal: 7,

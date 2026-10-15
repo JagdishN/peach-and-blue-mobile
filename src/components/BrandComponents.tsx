@@ -1,7 +1,10 @@
 import React from 'react';
-import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
-import { useTheme } from '../context/ThemeContext';
-import { fonts } from '../theme/theme';
+import { Image, Linking, Pressable, StyleSheet, Text } from 'react-native';
+
+// assets/logo-mark.png's own height/width ratio (597/600, cropped tight to
+// the artwork's bounding box) — keeps the badge from looking squashed/
+// stretched at any display size instead of hardcoding a near-1:1 guess.
+const LOGO_ASPECT_RATIO = 597 / 600;
 
 // Nivenxa Technologies attribution URL — CLAUDE.md "Non-negotiables":
 // deliberately routes to the software arm specifically (nivenxa.com's
@@ -36,19 +39,20 @@ interface SplashLogoProps {
   size?: 'large' | 'small';
 }
 
-// Text-based "Peach & Blue" wordmark — no logo source file exists yet
-// (open item in CLAUDE.md), so this mirrors the mockup's styled-text treatment
-// rather than a placeholder image. Themed, unlike NivenxaFooter above — this
-// is the client's brand wordmark, not the builder's mark.
+// Real logo artwork (client-supplied) — the badge already carries its own
+// "Peach & Blue / Laundry Services" wordmark in the brand's own typeface,
+// so this replaces the old hand-styled "Peach" "&" "Blue" Text trio
+// (a stand-in from before any real logo source file existed) rather than
+// stacking both and showing the name twice.
 export const SplashLogo: React.FC<SplashLogoProps> = ({ size = 'large' }) => {
-  const { colors } = useTheme();
   const isLarge = size === 'large';
+  const markSize = isLarge ? 200 : 130;
   return (
-    <View style={styles.logoWrap}>
-      <Text style={[styles.logoWord, { fontSize: isLarge ? 30 : 19, color: colors.peachPrimaryDark }]}>Peach</Text>
-      <Text style={[styles.logoAmp, { fontSize: isLarge ? 22 : 15, color: colors.navyDeep }]}>&amp;</Text>
-      <Text style={[styles.logoWord, { fontSize: isLarge ? 30 : 19, color: colors.navyDeep }]}>Blue</Text>
-    </View>
+    <Image
+      source={require('../../assets/logo-mark.png')}
+      style={{ width: markSize, height: markSize * LOGO_ASPECT_RATIO }}
+      resizeMode="contain"
+    />
   );
 };
 
@@ -67,19 +71,5 @@ const styles = StyleSheet.create({
     // Subtle tappability affordance — same convention as the About-page
     // credit (SettingsScreen.tsx), not a new pattern invented here.
     textDecorationLine: 'underline',
-  },
-  logoWrap: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 6,
-  },
-  logoWord: {
-    fontFamily: fonts.heading,
-    fontWeight: '700',
-  },
-  logoAmp: {
-    fontFamily: fonts.headingItalic,
-    fontStyle: 'italic',
-    fontWeight: '600',
   },
 });
