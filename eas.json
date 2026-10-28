@@ -13,13 +13,13 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": " https://peach-and-blue-backend.onrender.com"
+        "EXPO_PUBLIC_API_URL": "https://peachnblueapp.onrender.com"
       }
     },    
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_URL": " https://peach-and-blue-backend.onrender.com"
+        "EXPO_PUBLIC_API_URL": "https://peachnblueapp.onrender.com"
       }
     }
   },
