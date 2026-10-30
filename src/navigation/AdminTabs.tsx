@@ -3,9 +3,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { AdminDashboardScreen } from '../screens/admin/AdminDashboardScreen';
 import { GarmentCatalogueScreen } from '../screens/admin/GarmentCatalogueScreen';
 import { LedgerAgingScreen } from '../screens/admin/LedgerAgingScreen';
-import { BranchesScreen } from '../screens/admin/BranchesScreen';
 import { CustomerManagementScreen } from '../screens/admin/CustomerManagementScreen';
-import { StaffManagementScreen } from '../screens/admin/StaffManagementScreen';
 import { useTheme } from '../context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -14,8 +12,6 @@ export type AdminTabParamList = {
   Catalogue: undefined;
   Customers: undefined;
   Ledger: undefined;
-  Branches: undefined;
-  Staff: undefined;
 };
 
 const ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
@@ -23,13 +19,14 @@ const ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
   Catalogue: 'shirt-outline',
   Customers: 'people-outline',
   Ledger: 'wallet-outline',
-  Branches: 'business-outline',
-  Staff: 'person-outline',
 };
 
 const Tab = createBottomTabNavigator<AdminTabParamList>();
 
-// Matches the mockup's bottom .tab-bar (Orders / Catalogue / Ledger / Branches).
+// Branches and Staff moved out of the bottom tab bar into the Setup screen
+// (reachable from the Overview header's Setup icon, see AdminStack.tsx) —
+// down to 4 icon-only tabs per the nav-simplification task. Both screens are
+// unchanged otherwise; only how they're reached changed.
 export const AdminTabs: React.FC = () => {
   const { colors } = useTheme();
 
@@ -37,23 +34,26 @@ export const AdminTabs: React.FC = () => {
     <Tab.Navigator
        screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarIcon: ({ focused, color, size }) => {
+        tabBarShowLabel: false,
+        tabBarIcon: ({ color }) => {
           const iconName = ICONS[route.name];
-          return <Ionicons name={iconName} size={size} color={color} />;
+          return <Ionicons name={iconName} size={26} color={color} />;
         },
+        tabBarAccessibilityLabel: route.name,
+        // Icons-only now (tabBarShowLabel: false below) — gives Maestro's
+        // screenshot flow (.maestro/admin-flow.yaml) a stable selector now
+        // that there's no visible label text to tap on.
+        tabBarButtonTestID: `tab-${route.name.toLowerCase()}`,
         tabBarActiveTintColor: colors.white,
         tabBarInactiveTintColor: '#8FA0BE',
         tabBarActiveBackgroundColor: colors.peachPrimary,
         tabBarStyle: { backgroundColor: colors.chrome, borderTopWidth: 0 },
-        tabBarLabelStyle: { fontSize: 9, fontWeight: '700' },
       })}
     >
       <Tab.Screen name="Orders" component={AdminDashboardScreen} />
       <Tab.Screen name="Catalogue" component={GarmentCatalogueScreen} />
       <Tab.Screen name="Customers" component={CustomerManagementScreen} />
       <Tab.Screen name="Ledger" component={LedgerAgingScreen} />
-      <Tab.Screen name="Branches" component={BranchesScreen} />
-      <Tab.Screen name="Staff" component={StaffManagementScreen} />
     </Tab.Navigator>
   );
 };

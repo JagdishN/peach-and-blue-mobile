@@ -17,7 +17,7 @@ import {
   PricingUnit,
 } from '../../api/garments';
 import { getServiceTag, SPECIAL_CARE_TAG } from '../../theme/serviceTag';
-import { ColorTokens, fonts, radii, spacing } from '../../theme/theme';
+import { ColorTokens, fonts, radii, spacing, typography } from '../../theme/theme';
 import type { AdminStackParamList } from '../../navigation/AdminStack';
 
 type Nav = NativeStackNavigationProp<AdminStackParamList>;
@@ -320,6 +320,9 @@ export const GarmentCatalogueScreen: React.FC = () => {
       <Modal visible={editing !== null} transparent animationType="slide" onRequestClose={() => setEditing(null)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
+            {/* See BranchesScreen.tsx's identical comment — this is the
+                longest form of the four, so the tallest-content risk. */}
+            <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
             <Text style={styles.modalTitle}>{editing === 'new' ? 'Add Garment' : 'Edit Garment'}</Text>
 
             <Text style={styles.fieldLabel}>Name</Text>
@@ -480,6 +483,7 @@ export const GarmentCatalogueScreen: React.FC = () => {
             <Pressable style={styles.cancelButton} onPress={() => setEditing(null)}>
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </Pressable>
+            </ScrollView>
           </View>
           {/* Modal renders in its own native layer above AppScreen's footer,
               so it needs its own — CLAUDE.md's footer requirement is not
@@ -518,11 +522,11 @@ const createStyles = (colors: ColorTokens) =>
     title: {
       fontFamily: fonts.headingSemiBold,
       fontWeight: '600',
-      fontSize: 16,
+      fontSize: typography.screenHeading,
       color: colors.cream,
     },
     subtitle: {
-      fontSize: 10,
+      fontSize: typography.secondary,
       color: '#C8A67B',
       marginTop: 2,
     },
@@ -546,7 +550,7 @@ const createStyles = (colors: ColorTokens) =>
       borderRadius: radii.md,
       paddingVertical: spacing.sm,
       paddingHorizontal: spacing.md,
-      fontSize: 12,
+      fontSize: typography.formValue,
       color: colors.navyText,
       marginBottom: spacing.sm,
     },
@@ -574,7 +578,7 @@ const createStyles = (colors: ColorTokens) =>
       borderColor: colors.peachPrimary,
     },
     tabChipText: {
-      fontSize: 10.5,
+      fontSize: typography.caption,
       fontWeight: '700',
       color: colors.navyText,
     },
@@ -589,7 +593,7 @@ const createStyles = (colors: ColorTokens) =>
     // beneath it; a transparent background would let card content show
     // through underneath it while stuck.
     sectionHeader: {
-      fontSize: 10.5,
+      fontSize: typography.caption,
       fontWeight: '800',
       textTransform: 'uppercase',
       letterSpacing: 0.4,
@@ -599,7 +603,7 @@ const createStyles = (colors: ColorTokens) =>
       marginTop: spacing.sm,
     },
     empty: {
-      fontSize: 11,
+      fontSize: typography.body,
       color: colors.muted,
       marginTop: spacing.lg,
       textAlign: 'center',
@@ -627,15 +631,15 @@ const createStyles = (colors: ColorTokens) =>
       marginRight: spacing.xs,
     },
     garmentName: {
-      fontSize: 11.5,
+      fontSize: typography.cardHeading,
       fontWeight: '600',
       color: colors.navyText,
       flexShrink: 1,
     },
     categorySub: {
-      fontSize: 9.5,
+      fontSize: typography.secondary,
       color: colors.muted,
-      marginTop: 2,
+      marginTop: 3,
     },
     addButton: {
       backgroundColor: colors.peachPrimary,
@@ -647,28 +651,35 @@ const createStyles = (colors: ColorTokens) =>
     addButtonText: {
       color: colors.white,
       fontWeight: '700',
-      fontSize: 11.5,
+      fontSize: typography.button,
     },
     modalOverlay: {
       flex: 1,
       backgroundColor: 'rgba(14,33,66,0.4)',
       justifyContent: 'flex-end',
     },
+    // Review finding: unlike the other three Add/Edit sheets in this app,
+    // this one had no maxHeight at all — on this, the longest form, larger
+    // field text made that a real risk of the card (anchored to the
+    // bottom by modalOverlay's justifyContent:'flex-end') growing taller
+    // than the screen, pushing its own top (and the ScrollView just added
+    // above) off-screen instead of scrolling within a bounded box.
     modalCard: {
       backgroundColor: colors.surface,
       borderTopLeftRadius: radii.lg,
       borderTopRightRadius: radii.lg,
       padding: spacing.lg,
+      maxHeight: '85%',
     },
     modalTitle: {
       fontFamily: fonts.headingSemiBold,
       fontWeight: '600',
-      fontSize: 15,
+      fontSize: typography.sectionHeading,
       color: colors.navyDeep,
       marginBottom: spacing.md,
     },
     fieldLabel: {
-      fontSize: 9.5,
+      fontSize: typography.formLabel,
       fontWeight: '700',
       color: colors.navyText,
       marginBottom: spacing.xs,
@@ -680,7 +691,7 @@ const createStyles = (colors: ColorTokens) =>
       borderRadius: radii.md,
       paddingVertical: spacing.sm,
       paddingHorizontal: spacing.md,
-      fontSize: 13,
+      fontSize: typography.formValue,
       color: colors.navyText,
       marginBottom: spacing.sm,
     },
@@ -715,7 +726,7 @@ const createStyles = (colors: ColorTokens) =>
       borderColor: colors.chrome,
     },
     serviceToggleText: {
-      fontSize: 9,
+      fontSize: typography.button,
       fontWeight: '700',
       color: colors.navyDeep,
     },
@@ -740,7 +751,7 @@ const createStyles = (colors: ColorTokens) =>
       borderColor: colors.chrome,
     },
     serviceTypeChipText: {
-      fontSize: 10,
+      fontSize: typography.caption,
       fontWeight: '700',
       color: colors.navyDeep,
     },
@@ -748,13 +759,13 @@ const createStyles = (colors: ColorTokens) =>
       color: colors.cream,
     },
     hint: {
-      fontSize: 9.5,
+      fontSize: typography.secondary,
       color: colors.muted,
       marginBottom: spacing.sm,
     },
     error: {
       color: colors.danger,
-      fontSize: 11,
+      fontSize: typography.secondary,
       marginBottom: spacing.sm,
     },
     saveButton: {
@@ -770,7 +781,7 @@ const createStyles = (colors: ColorTokens) =>
     saveButtonText: {
       color: colors.white,
       fontWeight: '700',
-      fontSize: 12,
+      fontSize: typography.button,
     },
     deleteButton: {
       alignItems: 'center',
@@ -779,7 +790,7 @@ const createStyles = (colors: ColorTokens) =>
     deleteButtonText: {
       color: colors.danger,
       fontWeight: '700',
-      fontSize: 11,
+      fontSize: typography.button,
     },
     cancelButton: {
       alignItems: 'center',
@@ -787,6 +798,6 @@ const createStyles = (colors: ColorTokens) =>
     },
     cancelButtonText: {
       color: colors.muted,
-      fontSize: 11,
+      fontSize: typography.secondary,
     },
   });

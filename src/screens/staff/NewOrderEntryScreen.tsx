@@ -13,7 +13,7 @@ import { fetchGarments, Garment } from '../../api/garments';
 import { createOrder } from '../../api/orders';
 import { searchCustomers, createCustomer, markBagIssued, CustomerLookup } from '../../api/customers';
 import { ApiError } from '../../api/client';
-import { ColorTokens, fonts, radii, spacing } from '../../theme/theme';
+import { ColorTokens, fonts, radii, spacing, typography } from '../../theme/theme';
 import { getServiceTag, SPECIAL_CARE_TAG } from '../../theme/serviceTag';
 import type { StaffStackParamList } from '../../navigation/StaffStack';
 
@@ -738,11 +738,11 @@ const createStyles = (colors: ColorTokens) =>
     title: {
       fontFamily: fonts.headingSemiBold,
       fontWeight: '600',
-      fontSize: 16,
+      fontSize: typography.screenHeading,
       color: colors.cream,
     },
     subtitle: {
-      fontSize: 10,
+      fontSize: typography.secondary,
       color: '#C8A67B',
       marginTop: 2,
     },
@@ -766,13 +766,13 @@ const createStyles = (colors: ColorTokens) =>
     searchButtonText: {
       color: colors.white,
       fontWeight: '700',
-      fontSize: 11.5,
+      fontSize: typography.button,
     },
     resultsBlock: {
       marginBottom: spacing.sm,
     },
     resultsLabel: {
-      fontSize: 9.5,
+      fontSize: typography.caption,
       fontWeight: '700',
       color: colors.muted,
       textTransform: 'uppercase',
@@ -793,14 +793,14 @@ const createStyles = (colors: ColorTokens) =>
       flexShrink: 1,
     },
     resultName: {
-      fontSize: 12,
+      fontSize: typography.cardHeading,
       fontWeight: '700',
       color: colors.navyText,
     },
     resultLocation: {
-      fontSize: 10.5,
+      fontSize: typography.secondary,
       color: colors.muted,
-      marginTop: 1,
+      marginTop: 2,
     },
     newCustomerBlock: {
       marginBottom: spacing.sm,
@@ -815,7 +815,7 @@ const createStyles = (colors: ColorTokens) =>
     addButtonText: {
       color: colors.white,
       fontWeight: '700',
-      fontSize: 11.5,
+      fontSize: typography.button,
     },
     confirmedCustomerCard: {
       flexDirection: 'row',
@@ -831,7 +831,7 @@ const createStyles = (colors: ColorTokens) =>
     changeCustomerLink: {
       color: colors.peachPrimary,
       fontWeight: '700',
-      fontSize: 11,
+      fontSize: typography.secondary,
     },
     bagRow: {
       marginBottom: spacing.sm,
@@ -841,13 +841,13 @@ const createStyles = (colors: ColorTokens) =>
       borderWidth: 1.5,
       borderColor: colors.peachPrimary,
       borderRadius: radii.sm,
-      paddingVertical: spacing.xs,
-      paddingHorizontal: spacing.sm,
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.md,
     },
     issueBagButtonText: {
       color: colors.peachPrimary,
       fontWeight: '700',
-      fontSize: 10.5,
+      fontSize: typography.button,
     },
     body: {
       flex: 1,
@@ -860,7 +860,7 @@ const createStyles = (colors: ColorTokens) =>
       minHeight: 0,
     },
     fieldLabel: {
-      fontSize: 9.5,
+      fontSize: typography.formLabel,
       fontWeight: '700',
       color: colors.navyText,
       marginBottom: spacing.xs,
@@ -872,13 +872,13 @@ const createStyles = (colors: ColorTokens) =>
       borderRadius: radii.md,
       paddingVertical: spacing.sm,
       paddingHorizontal: spacing.md,
-      fontSize: 13,
+      fontSize: typography.formValue,
       color: colors.navyText,
       marginBottom: spacing.sm,
     },
     sectionTitle: {
-      fontSize: 12.5,
-      fontWeight: '700',
+      fontSize: typography.sectionHeading,
+      fontWeight: '600',
       color: colors.navyText,
       marginTop: spacing.sm,
       marginBottom: spacing.sm,
@@ -907,7 +907,7 @@ const createStyles = (colors: ColorTokens) =>
       borderColor: colors.peachPrimary,
     },
     tabChipText: {
-      fontSize: 10.5,
+      fontSize: typography.caption,
       fontWeight: '700',
       color: colors.navyText,
     },
@@ -922,7 +922,7 @@ const createStyles = (colors: ColorTokens) =>
       minHeight: 0,
     },
     noResultsText: {
-      fontSize: 11,
+      fontSize: typography.body,
       color: colors.muted,
       textAlign: 'center',
       marginTop: spacing.lg,
@@ -931,7 +931,7 @@ const createStyles = (colors: ColorTokens) =>
     // (stickySectionHeadersEnabled) and sits on top of scrolling rows
     // beneath it, same as GarmentCatalogueScreen.tsx's sectionHeader.
     categoryHeader: {
-      fontSize: 10.5,
+      fontSize: typography.caption,
       fontWeight: '800',
       color: colors.muted,
       textTransform: 'uppercase',
@@ -977,15 +977,15 @@ const createStyles = (colors: ColorTokens) =>
       marginRight: spacing.xs,
     },
     garmentName: {
-      fontSize: 11.5,
+      fontSize: typography.cardHeading,
       fontWeight: '600',
       color: colors.navyText,
       flexShrink: 1,
     },
     garmentPrice: {
-      fontSize: 10.5,
+      fontSize: typography.secondary,
       color: colors.muted,
-      marginTop: 2,
+      marginTop: 3,
     },
     priceRangeRow: {
       flexDirection: 'row',
@@ -1014,11 +1014,11 @@ const createStyles = (colors: ColorTokens) =>
       borderWidth: 1,
       borderColor: colors.peachPrimary,
       borderRadius: 6,
-      paddingVertical: 2,
+      paddingVertical: 3,
       paddingHorizontal: spacing.xs,
-      fontSize: 10.5,
+      fontSize: typography.secondary,
       color: colors.navyText,
-      minWidth: 54,
+      minWidth: 60,
     },
     weightInputWrap: {
       flexDirection: 'row',
@@ -1030,25 +1030,25 @@ const createStyles = (colors: ColorTokens) =>
       borderWidth: 1,
       borderColor: colors.peachPrimary,
       borderRadius: 6,
-      paddingVertical: 4,
+      paddingVertical: 5,
       paddingHorizontal: spacing.sm,
-      fontSize: 12,
+      fontSize: typography.secondary,
       color: colors.navyText,
-      minWidth: 56,
+      minWidth: 62,
       textAlign: 'right',
     },
     weightUnit: {
-      fontSize: 10.5,
+      fontSize: typography.secondary,
       color: colors.muted,
       fontWeight: '600',
     },
     minimumNote: {
-      fontSize: 9.5,
+      fontSize: typography.secondary,
       color: colors.danger,
-      marginTop: 2,
+      marginTop: 3,
     },
     minimumBanner: {
-      fontSize: 10,
+      fontSize: typography.secondary,
       color: colors.warning,
       backgroundColor: colors.warningBg,
       borderRadius: radii.sm,
@@ -1077,10 +1077,10 @@ const createStyles = (colors: ColorTokens) =>
       fontSize: 14,
     },
     stepperNum: {
-      fontSize: 12,
+      fontSize: typography.formValue,
       fontWeight: '700',
       color: colors.navyText,
-      minWidth: 16,
+      minWidth: 20,
       textAlign: 'center',
     },
     totalBar: {
@@ -1094,13 +1094,13 @@ const createStyles = (colors: ColorTokens) =>
       marginTop: spacing.sm,
     },
     totalLabel: {
-      fontSize: 10,
+      fontSize: typography.caption,
       color: '#C8A67B',
       fontWeight: '600',
     },
     error: {
       color: colors.danger,
-      fontSize: 11,
+      fontSize: typography.secondary,
       marginTop: spacing.sm,
     },
     confirmButton: {
@@ -1116,6 +1116,6 @@ const createStyles = (colors: ColorTokens) =>
     confirmButtonText: {
       color: colors.white,
       fontWeight: '700',
-      fontSize: 11.5,
+      fontSize: typography.button,
     },
   });

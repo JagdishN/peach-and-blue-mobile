@@ -7,7 +7,7 @@ import { ApiError } from '../../api/client';
 import { requestOtp, verifyOtp } from '../../api/auth';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import { ColorTokens, radii, spacing } from '../../theme/theme';
+import { ColorTokens, radii, spacing, typography } from '../../theme/theme';
 
 type Step = 'phone' | 'otp';
 
@@ -137,7 +137,7 @@ const createStyles = (colors: ColorTokens) =>
       marginVertical: spacing.lg,
     },
     headerSub: {
-      fontSize: 9.5,
+      fontSize: typography.caption,
       fontWeight: '700',
       color: colors.warning,
       letterSpacing: 2,
@@ -145,7 +145,7 @@ const createStyles = (colors: ColorTokens) =>
       marginTop: spacing.xs,
     },
     fieldLabel: {
-      fontSize: 9.5,
+      fontSize: typography.formLabel,
       fontWeight: '700',
       color: colors.navyText,
       marginBottom: spacing.xs,
@@ -157,7 +157,7 @@ const createStyles = (colors: ColorTokens) =>
       borderRadius: radii.md,
       paddingVertical: spacing.sm,
       paddingHorizontal: spacing.md,
-      fontSize: 13,
+      fontSize: typography.formValue,
       color: colors.navyText,
       marginBottom: spacing.sm,
     },
@@ -176,7 +176,7 @@ const createStyles = (colors: ColorTokens) =>
       paddingHorizontal: spacing.md,
     },
     countryCodeText: {
-      fontSize: 13,
+      fontSize: typography.formValue,
       fontWeight: '700',
       color: colors.navyText,
     },
@@ -191,7 +191,7 @@ const createStyles = (colors: ColorTokens) =>
       borderRadius: radii.md,
       paddingVertical: spacing.sm,
       paddingHorizontal: spacing.md,
-      fontSize: 13,
+      fontSize: typography.formValue,
       color: colors.navyText,
     },
     phoneFieldIconPadding: {
@@ -205,7 +205,7 @@ const createStyles = (colors: ColorTokens) =>
     },
     error: {
       color: colors.danger,
-      fontSize: 11,
+      fontSize: typography.secondary,
       marginBottom: spacing.sm,
     },
     button: {
@@ -221,6 +221,6 @@ const createStyles = (colors: ColorTokens) =>
     buttonText: {
       color: colors.white,
       fontWeight: '700',
-      fontSize: 13,
+      fontSize: typography.button,
     },
   });

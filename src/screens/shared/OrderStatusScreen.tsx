@@ -18,7 +18,7 @@ import {
 import { fetchUsers, StaffUser } from '../../api/users';
 import { getDisplayName } from '../../utils/displayName';
 import { ApiError } from '../../api/client';
-import { ColorTokens, fonts, radii, spacing } from '../../theme/theme';
+import { ColorTokens, fonts, radii, spacing, typography } from '../../theme/theme';
 
 type OrderStatusRoute = RouteProp<{ OrderStatus: { orderId: string } }, 'OrderStatus'>;
 
@@ -387,11 +387,11 @@ const createStyles = (colors: ColorTokens) =>
     title: {
       fontFamily: fonts.headingSemiBold,
       fontWeight: '600',
-      fontSize: 16,
+      fontSize: typography.screenHeading,
       color: colors.cream,
     },
     subtitle: {
-      fontSize: 10,
+      fontSize: typography.secondary,
       color: '#C8A67B',
       marginTop: 2,
     },
@@ -399,8 +399,8 @@ const createStyles = (colors: ColorTokens) =>
       paddingTop: spacing.lg,
     },
     sectionTitle: {
-      fontSize: 12.5,
-      fontWeight: '700',
+      fontSize: typography.sectionHeading,
+      fontWeight: '600',
       color: colors.navyText,
       marginBottom: spacing.sm,
     },
@@ -435,13 +435,13 @@ const createStyles = (colors: ColorTokens) =>
       marginBottom: spacing.lg,
     },
     trackLabel: {
-      fontSize: 7.5,
+      fontSize: typography.caption,
       fontWeight: '700',
       color: colors.muted,
     },
     error: {
       color: colors.danger,
-      fontSize: 11,
+      fontSize: typography.secondary,
       marginBottom: spacing.sm,
     },
     advanceButton: {
@@ -457,7 +457,7 @@ const createStyles = (colors: ColorTokens) =>
     advanceButtonText: {
       color: colors.white,
       fontWeight: '700',
-      fontSize: 11.5,
+      fontSize: typography.button,
     },
     revisionCard: {
       backgroundColor: colors.peachCard,
@@ -468,7 +468,7 @@ const createStyles = (colors: ColorTokens) =>
       marginTop: spacing.lg,
     },
     fieldLabel: {
-      fontSize: 9.5,
+      fontSize: typography.formLabel,
       fontWeight: '700',
       color: colors.navyText,
       marginTop: spacing.sm,
@@ -481,7 +481,7 @@ const createStyles = (colors: ColorTokens) =>
       borderRadius: radii.md,
       paddingVertical: spacing.sm,
       paddingHorizontal: spacing.md,
-      fontSize: 13,
+      fontSize: typography.formValue,
       color: colors.muted,
     },
     field: {
@@ -491,7 +491,7 @@ const createStyles = (colors: ColorTokens) =>
       borderRadius: radii.md,
       paddingVertical: spacing.sm,
       paddingHorizontal: spacing.md,
-      fontSize: 13,
+      fontSize: typography.formValue,
       color: colors.navyDeep,
       fontWeight: '700',
     },
@@ -502,8 +502,8 @@ const createStyles = (colors: ColorTokens) =>
       marginBottom: spacing.xs,
     },
     toggle: {
-      paddingVertical: spacing.xs,
-      paddingHorizontal: spacing.sm,
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.md,
       borderRadius: radii.sm,
       borderWidth: 1.5,
       borderColor: colors.navyDeep,
@@ -513,7 +513,7 @@ const createStyles = (colors: ColorTokens) =>
       borderColor: colors.chrome,
     },
     toggleText: {
-      fontSize: 10,
+      fontSize: typography.button,
       fontWeight: '700',
       color: colors.navyDeep,
     },
@@ -521,7 +521,7 @@ const createStyles = (colors: ColorTokens) =>
       color: colors.cream,
     },
     hint: {
-      fontSize: 9.5,
+      fontSize: typography.secondary,
       color: colors.muted,
     },
   });

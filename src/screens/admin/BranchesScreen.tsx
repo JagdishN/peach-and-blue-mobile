@@ -2,12 +2,13 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AppScreen } from '../../components/AppScreen';
 import { NivenxaFooter } from '../../components/BrandComponents';
 import { Tag } from '../../components/Tag';
 import { useTheme } from '../../context/ThemeContext';
 import { fetchBranches, createBranch, updateBranch, Branch, BranchType } from '../../api/branches';
-import { ColorTokens, fonts, radii, spacing } from '../../theme/theme';
+import { ColorTokens, fonts, radii, spacing, typography } from '../../theme/theme';
 import type { AdminStackParamList } from '../../navigation/AdminStack';
 
 const ADDRESS_PLACEHOLDER: Record<BranchType, string> = {
@@ -117,7 +118,14 @@ export const BranchesScreen: React.FC = () => {
   return (
     <AppScreen scroll={false}>
       <View style={styles.appbar}>
-        <Text style={styles.title}>Branches</Text>
+        {/* Now reached via Setup (pushed from the stack), not a tab root —
+            needs its own back affordance, same convention as SettingsScreen. */}
+        <View style={styles.appbarTopRow}>
+          <Pressable style={styles.backButton} onPress={() => navigation.goBack()} hitSlop={8}>
+            <MaterialCommunityIcons name="chevron-left" size={22} color={colors.cream} />
+          </Pressable>
+          <Text style={styles.title}>Branches</Text>
+        </View>
         <Text style={styles.subtitle}>{branches.length} active · Apartment or Area</Text>
       </View>
 
@@ -146,6 +154,14 @@ export const BranchesScreen: React.FC = () => {
       <Modal visible={editing !== null} transparent animationType="slide" onRequestClose={() => setEditing(null)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
+            {/* Review finding (typography pass follow-up): this card's
+                maxHeight was never paired with a scrollable child — fine
+                at the old, smaller field/label sizes, but larger text now
+                makes it plausible for a short device to push Save/Cancel
+                past the bottom with no way to reach them. ScrollView here
+                gets a bounded box to scroll within because modalCard's
+                maxHeight clamps it once content exceeds that ceiling. */}
+            <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
             <Text style={styles.modalTitle}>{editing === 'new' ? 'Add Branch' : 'Edit Branch'}</Text>
 
             <Text style={styles.fieldLabel}>Branch Name</Text>
@@ -218,6 +234,7 @@ export const BranchesScreen: React.FC = () => {
             <Pressable style={styles.cancelButton} onPress={() => setEditing(null)}>
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </Pressable>
+            </ScrollView>
           </View>
           {/* Modal renders in its own native layer above AppScreen's footer,
               so it needs its own — CLAUDE.md's footer requirement is not
@@ -238,10 +255,11 @@ const createStyles = (colors: ColorTokens) =>
     },
     appbarTopRow: {
       flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'flex-start',
+      alignItems: 'center',
+      gap: spacing.sm,
+      flexWrap: 'wrap',
     },
-    settingsButton: {
+    backButton: {
       width: 28,
       height: 28,
       borderRadius: radii.pill,
@@ -249,18 +267,18 @@ const createStyles = (colors: ColorTokens) =>
       alignItems: 'center',
       justifyContent: 'center',
     },
-    settingsButtonText: {
-      fontSize: 14,
-      color: colors.cream,
-    },
+    // flexShrink/flexWrap (here and on appbarTopRow above): defensive
+    // against Android's larger-text accessibility setting — see
+    // StaffManagementScreen.tsx's identical fix for the concrete case.
     title: {
+      flexShrink: 1,
       fontFamily: fonts.headingSemiBold,
       fontWeight: '600',
-      fontSize: 16,
+      fontSize: typography.screenHeading,
       color: colors.cream,
     },
     subtitle: {
-      fontSize: 10,
+      fontSize: typography.secondary,
       color: '#C8A67B',
       marginTop: 2,
     },
@@ -287,16 +305,19 @@ const createStyles = (colors: ColorTokens) =>
     nameRow: {
       flexDirection: 'row',
       alignItems: 'center',
+      flexWrap: 'wrap',
+      gap: spacing.xs,
     },
     cardTitle: {
-      fontSize: 12.5,
+      flexShrink: 1,
+      fontSize: typography.cardHeading,
       fontWeight: '700',
       color: colors.navyText,
     },
     cardSub: {
-      fontSize: 10.5,
+      fontSize: typography.secondary,
       color: colors.muted,
-      marginTop: 2,
+      marginTop: 3,
     },
     addButton: {
       backgroundColor: colors.peachPrimary,
@@ -308,7 +329,7 @@ const createStyles = (colors: ColorTokens) =>
     addButtonText: {
       color: colors.white,
       fontWeight: '700',
-      fontSize: 11.5,
+      fontSize: typography.button,
     },
     modalOverlay: {
       flex: 1,
@@ -325,12 +346,12 @@ const createStyles = (colors: ColorTokens) =>
     modalTitle: {
       fontFamily: fonts.headingSemiBold,
       fontWeight: '600',
-      fontSize: 15,
+      fontSize: typography.sectionHeading,
       color: colors.navyDeep,
       marginBottom: spacing.md,
     },
     fieldLabel: {
-      fontSize: 9.5,
+      fontSize: typography.formLabel,
       fontWeight: '700',
       color: colors.navyText,
       marginBottom: spacing.xs,
@@ -342,7 +363,7 @@ const createStyles = (colors: ColorTokens) =>
       borderRadius: radii.md,
       paddingVertical: spacing.sm,
       paddingHorizontal: spacing.md,
-      fontSize: 13,
+      fontSize: typography.formValue,
       color: colors.navyText,
       marginBottom: spacing.sm,
     },
@@ -364,7 +385,7 @@ const createStyles = (colors: ColorTokens) =>
       borderColor: colors.chrome,
     },
     typeToggleText: {
-      fontSize: 10.5,
+      fontSize: typography.button,
       fontWeight: '700',
       color: colors.navyDeep,
     },
@@ -373,7 +394,7 @@ const createStyles = (colors: ColorTokens) =>
     },
     error: {
       color: colors.danger,
-      fontSize: 11,
+      fontSize: typography.secondary,
       marginBottom: spacing.sm,
     },
     saveButton: {
@@ -389,7 +410,7 @@ const createStyles = (colors: ColorTokens) =>
     saveButtonText: {
       color: colors.white,
       fontWeight: '700',
-      fontSize: 12,
+      fontSize: typography.button,
     },
     cancelButton: {
       alignItems: 'center',
@@ -397,6 +418,6 @@ const createStyles = (colors: ColorTokens) =>
     },
     cancelButtonText: {
       color: colors.muted,
-      fontSize: 11,
+      fontSize: typography.secondary,
     },
   });

@@ -110,6 +110,27 @@ export const spacing = {
   xxl: 32,
 } as const;
 
+// Shared readability scale (2026-10-30 typography pass) — the app had grown
+// organically screen-by-screen with font sizes as low as 7.5sp, each one a
+// one-off per style key rather than drawn from a common scale. This is that
+// scale, named by ROLE (not by screen), so every screen's "section heading"
+// etc. reads consistently instead of drifting slightly per file. Existing
+// per-key names in each screen's own styles are kept (e.g. `cardSub`) —
+// this just gives their numeric values a shared source instead of a bare
+// literal, and a name to check new code against.
+export const typography = {
+  screenHeading: 24, // e.g. "Overview", "Staff & Admin Accounts"
+  sectionHeading: 19, // e.g. "Needs Attention"
+  cardHeading: 16, // card/list-item titles (customer name, branch name, order #)
+  body: 15, // ordinary readable row/body text
+  formLabel: 14,
+  formValue: 16,
+  button: 15,
+  secondary: 13.5, // dates, subtitles, secondary row text
+  caption: 12, // smallest allowed for ordinary content — tags, meta text
+  metric: 30, // dashboard/ledger headline numbers (revenue, dues, counts)
+} as const;
+
 export const radii = {
   sm: 8,
   md: 9,

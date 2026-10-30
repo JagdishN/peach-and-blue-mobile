@@ -24,7 +24,7 @@ import {
   Customer,
 } from '../../api/customers';
 import { fetchBranches, Branch } from '../../api/branches';
-import { ColorTokens, fonts, radii, spacing, withOpacity } from '../../theme/theme';
+import { ColorTokens, fonts, radii, spacing, typography, withOpacity } from '../../theme/theme';
 import type { AdminStackParamList } from '../../navigation/AdminStack';
 
 const BILLING_MODE_LABEL: Record<BillingMode, string> = {
@@ -55,6 +55,12 @@ export const CustomerManagementScreen: React.FC = () => {
   const [editing, setEditing] = useState<Customer | null>(null);
   const [editFullName, setEditFullName] = useState('');
   const [editPhoneNumber, setEditPhoneNumber] = useState('');
+  // Both optional — every WhatsApp notification now fans out to primary +
+  // whichever of these are set (2026-10-30, client request). Stored as bare
+  // digits, same as editPhoneNumber, so sanitizePhoneInput/the +91 prefixing
+  // stays consistent across all three.
+  const [editAlternativePhoneNumber, setEditAlternativePhoneNumber] = useState('');
+  const [editSecondaryPhoneNumber, setEditSecondaryPhoneNumber] = useState('');
   const [editLocationLabel, setEditLocationLabel] = useState('');
   const [billingMode, setBillingMode] = useState<BillingMode>('daily');
   const [discountEnabled, setDiscountEnabled] = useState(false);
@@ -208,6 +214,8 @@ export const CustomerManagementScreen: React.FC = () => {
     setEditing(customer);
     setEditFullName(customer.fullName);
     setEditPhoneNumber(customer.phoneNumber.replace(/^\+91/, ''));
+    setEditAlternativePhoneNumber((customer.alternativePhoneNumber ?? '').replace(/^\+91/, ''));
+    setEditSecondaryPhoneNumber((customer.secondaryPhoneNumber ?? '').replace(/^\+91/, ''));
     setEditLocationLabel(customer.locationLabel);
     setBillingMode(customer.billingMode);
     setDiscountEnabled(customer.discountEnabled);
@@ -253,12 +261,29 @@ export const CustomerManagementScreen: React.FC = () => {
       return;
     }
 
+    // Both optional — only validated if the admin actually typed something;
+    // an empty field is a legitimate "not provided" / "clear it" value.
+    const altDigits = sanitizePhoneInput(editAlternativePhoneNumber);
+    if (editAlternativePhoneNumber && altDigits.length !== 10) {
+      setError('Alternative phone number must contain exactly 10 digits.');
+      return;
+    }
+    const secDigits = sanitizePhoneInput(editSecondaryPhoneNumber);
+    if (editSecondaryPhoneNumber && secDigits.length !== 10) {
+      setError('Secondary phone number must contain exactly 10 digits.');
+      return;
+    }
+
     setSaving(true);
     setError(null);
     try {
       await updateCustomer(editing.id, {
         fullName: trimmedName,
         phoneNumber: `+91${digits}`,
+        // An empty string here clears the field server-side (customerController.ts::
+        // updateCustomerHandler) — distinct from omitting the key entirely.
+        alternativePhoneNumber: altDigits ? `+91${altDigits}` : '',
+        secondaryPhoneNumber: secDigits ? `+91${secDigits}` : '',
         locationLabel: editLocationLabel.trim(),
       });
 
@@ -413,6 +438,8 @@ export const CustomerManagementScreen: React.FC = () => {
       <Modal visible={creating} transparent animationType="slide" onRequestClose={() => setCreating(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
+            {/* See BranchesScreen.tsx's identical comment. */}
+            <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
             <Text style={styles.modalTitle}>Add Customer</Text>
 
             <Text style={styles.fieldLabel}>Full Name</Text>
@@ -483,6 +510,7 @@ export const CustomerManagementScreen: React.FC = () => {
             <Pressable style={styles.cancelButton} onPress={() => setCreating(false)}>
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </Pressable>
+            </ScrollView>
           </View>
           <NivenxaFooter />
         </View>
@@ -491,6 +519,9 @@ export const CustomerManagementScreen: React.FC = () => {
       <Modal visible={editing !== null} transparent animationType="slide" onRequestClose={() => setEditing(null)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
+            {/* See BranchesScreen.tsx's identical comment — this Edit sheet
+                is the longest form in the file (bag status/action included). */}
+            <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
             <Text style={styles.modalTitle}>{editing?.fullName}</Text>
             <Text style={styles.modalSubtitle}>
               {editing?.locationLabel} · {editing?.branch.branchName}
@@ -513,6 +544,32 @@ export const CustomerManagementScreen: React.FC = () => {
               onChangeText={setEditPhoneNumber}
               sanitize={sanitizePhoneInput}
               placeholder="Enter Phone number"
+              placeholderTextColor={withOpacity(colors.muted, 0.5)}
+              keyboardType="number-pad"
+            />
+
+            {/* Both optional (2026-10-30, client request) — every WhatsApp
+                notification (pickup, delivery, payment, and everything else)
+                now fans out to the primary number plus whichever of these
+                are set. */}
+            <Text style={styles.fieldLabel}>Alternative Phone Number (optional)</Text>
+            <SanitizedTextInput
+              style={styles.field}
+              value={editAlternativePhoneNumber}
+              onChangeText={setEditAlternativePhoneNumber}
+              sanitize={sanitizePhoneInput}
+              placeholder="Enter alternative phone number"
+              placeholderTextColor={withOpacity(colors.muted, 0.5)}
+              keyboardType="number-pad"
+            />
+
+            <Text style={styles.fieldLabel}>Secondary Phone Number (optional)</Text>
+            <SanitizedTextInput
+              style={styles.field}
+              value={editSecondaryPhoneNumber}
+              onChangeText={setEditSecondaryPhoneNumber}
+              sanitize={sanitizePhoneInput}
+              placeholder="Enter secondary phone number"
               placeholderTextColor={withOpacity(colors.muted, 0.5)}
               keyboardType="number-pad"
             />
@@ -629,6 +686,7 @@ export const CustomerManagementScreen: React.FC = () => {
             <Pressable style={styles.cancelButton} onPress={() => setEditing(null)}>
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </Pressable>
+            </ScrollView>
           </View>
           {/* Modal renders in its own native layer above AppScreen's footer,
               so it needs its own — CLAUDE.md's footer requirement is not
@@ -667,11 +725,11 @@ const createStyles = (colors: ColorTokens) =>
     title: {
       fontFamily: fonts.headingSemiBold,
       fontWeight: '600',
-      fontSize: 16,
+      fontSize: typography.screenHeading,
       color: colors.cream,
     },
     subtitle: {
-      fontSize: 10,
+      fontSize: typography.secondary,
       color: '#C8A67B',
       marginTop: 2,
     },
@@ -694,7 +752,7 @@ const createStyles = (colors: ColorTokens) =>
       borderRadius: radii.md,
       paddingVertical: spacing.sm,
       paddingHorizontal: spacing.md,
-      fontSize: 12,
+      fontSize: typography.formValue,
       color: colors.navyText,
       marginBottom: spacing.sm,
     },
@@ -708,10 +766,10 @@ const createStyles = (colors: ColorTokens) =>
     addButtonText: {
       color: colors.white,
       fontWeight: '700',
-      fontSize: 11.5,
+      fontSize: typography.button,
     },
     sectionHeader: {
-      fontSize: 10.5,
+      fontSize: typography.caption,
       fontWeight: '800',
       textTransform: 'uppercase',
       letterSpacing: 0.4,
@@ -739,17 +797,18 @@ const createStyles = (colors: ColorTokens) =>
       flexShrink: 1,
     },
     customerName: {
-      fontSize: 12,
+      flexShrink: 1,
+      fontSize: typography.cardHeading,
       fontWeight: '700',
       color: colors.navyText,
     },
     cardSub: {
-      fontSize: 10.5,
+      fontSize: typography.secondary,
       color: colors.muted,
       marginTop: 3,
     },
     empty: {
-      fontSize: 11,
+      fontSize: typography.body,
       color: colors.muted,
       marginTop: spacing.lg,
       textAlign: 'center',
@@ -769,16 +828,16 @@ const createStyles = (colors: ColorTokens) =>
     modalTitle: {
       fontFamily: fonts.headingSemiBold,
       fontWeight: '600',
-      fontSize: 15,
+      fontSize: typography.sectionHeading,
       color: colors.navyDeep,
     },
     modalSubtitle: {
-      fontSize: 10.5,
+      fontSize: typography.secondary,
       color: colors.muted,
       marginBottom: spacing.md,
     },
     fieldLabel: {
-      fontSize: 9.5,
+      fontSize: typography.formLabel,
       fontWeight: '700',
       color: colors.navyText,
       marginTop: spacing.sm,
@@ -796,7 +855,7 @@ const createStyles = (colors: ColorTokens) =>
       marginBottom: spacing.sm,
     },
     secondaryLabel: {
-      fontSize: 8.5,
+      fontSize: typography.caption,
       fontWeight: '700',
       textTransform: 'uppercase',
       letterSpacing: 0.3,
@@ -804,7 +863,7 @@ const createStyles = (colors: ColorTokens) =>
       marginBottom: spacing.xs,
     },
     bagStatus: {
-      fontSize: 10.5,
+      fontSize: typography.secondary,
       color: colors.navyText,
       marginBottom: spacing.xs,
     },
@@ -820,7 +879,7 @@ const createStyles = (colors: ColorTokens) =>
     bagActionButtonText: {
       color: colors.navyText,
       fontWeight: '700',
-      fontSize: 10,
+      fontSize: typography.button,
     },
     toggle: {
       flex: 1,
@@ -835,7 +894,7 @@ const createStyles = (colors: ColorTokens) =>
       borderColor: colors.chrome,
     },
     toggleText: {
-      fontSize: 10.5,
+      fontSize: typography.button,
       fontWeight: '700',
       color: colors.navyDeep,
     },
@@ -849,7 +908,7 @@ const createStyles = (colors: ColorTokens) =>
       borderRadius: radii.md,
       paddingVertical: spacing.sm,
       paddingHorizontal: spacing.md,
-      fontSize: 13,
+      fontSize: typography.formValue,
       color: colors.navyText,
       marginBottom: spacing.xs,
     },
@@ -857,13 +916,13 @@ const createStyles = (colors: ColorTokens) =>
       opacity: 0.5,
     },
     hint: {
-      fontSize: 9.5,
+      fontSize: typography.secondary,
       color: colors.muted,
       marginBottom: spacing.sm,
     },
     error: {
       color: colors.danger,
-      fontSize: 11,
+      fontSize: typography.secondary,
       marginBottom: spacing.sm,
     },
     saveButton: {
@@ -879,7 +938,7 @@ const createStyles = (colors: ColorTokens) =>
     saveButtonText: {
       color: colors.white,
       fontWeight: '700',
-      fontSize: 12,
+      fontSize: typography.button,
     },
     deleteButton: {
       alignItems: 'center',
@@ -888,7 +947,7 @@ const createStyles = (colors: ColorTokens) =>
     deleteButtonText: {
       color: colors.danger,
       fontWeight: '700',
-      fontSize: 11,
+      fontSize: typography.button,
     },
     cancelButton: {
       alignItems: 'center',
@@ -896,6 +955,6 @@ const createStyles = (colors: ColorTokens) =>
     },
     cancelButtonText: {
       color: colors.muted,
-      fontSize: 11,
+      fontSize: typography.secondary,
     },
   });

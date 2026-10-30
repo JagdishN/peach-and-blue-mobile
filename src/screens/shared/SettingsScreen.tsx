@@ -5,7 +5,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AppScreen } from '../../components/AppScreen';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import { ColorTokens, fonts, spacing, radii } from '../../theme/theme';
+import { ColorTokens, fonts, spacing, radii, typography } from '../../theme/theme';
 
 // Houses the About content CLAUDE.md requires ("Technology by Nivenxa
 // Technologies", a tappable link, on the About page) plus Log Out — previously
@@ -81,7 +81,7 @@ const createStyles = (colors: ColorTokens) =>
     title: {
       fontFamily: fonts.headingSemiBold,
       fontWeight: '600',
-      fontSize: 16,
+      fontSize: typography.screenHeading,
       color: colors.cream,
     },
     body: {
@@ -89,8 +89,8 @@ const createStyles = (colors: ColorTokens) =>
       padding: 14,
     },
     sectionTitle: {
-      fontSize: 12.5,
-      fontWeight: '700',
+      fontSize: typography.sectionHeading,
+      fontWeight: '600',
       color: colors.navyText,
       marginTop: spacing.md,
       marginBottom: spacing.sm,
@@ -106,23 +106,23 @@ const createStyles = (colors: ColorTokens) =>
     appName: {
       fontFamily: fonts.heading,
       fontWeight: '700',
-      fontSize: 18,
+      fontSize: typography.cardHeading,
       color: colors.peachPrimaryDark,
     },
     tagline: {
-      fontSize: 10,
+      fontSize: typography.caption,
       color: colors.muted,
       marginTop: 4,
       textTransform: 'uppercase',
       letterSpacing: 1,
     },
     version: {
-      fontSize: 10.5,
+      fontSize: typography.caption,
       color: colors.muted,
       marginTop: spacing.md,
     },
     nivenxa: {
-      fontSize: 10.5,
+      fontSize: typography.secondary,
       fontWeight: '700',
       color: colors.navyText,
       marginTop: spacing.xs,
@@ -141,6 +141,6 @@ const createStyles = (colors: ColorTokens) =>
     logoutButtonText: {
       color: colors.danger,
       fontWeight: '700',
-      fontSize: 11.5,
+      fontSize: typography.button,
     },
   });

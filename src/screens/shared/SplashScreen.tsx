@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
-import { ColorTokens } from '../../theme/theme';
+import { ColorTokens, typography } from '../../theme/theme';
 import { SplashLogo } from '../../components/BrandComponents';
 
 // Presentational only — App.tsx owns the 2-second timer and decides when
@@ -34,7 +34,7 @@ const createStyles = (colors: ColorTokens) =>
     },
     tagline: {
       marginTop: 10,
-      fontSize: 10,
+      fontSize: typography.caption,
       letterSpacing: 2,
       textTransform: 'uppercase',
       color: colors.warning,
@@ -44,7 +44,7 @@ const createStyles = (colors: ColorTokens) =>
       bottom: 34,
     },
     poweredByText: {
-      fontSize: 9,
+      fontSize: typography.caption,
       letterSpacing: 0.5,
       color: colors.muted,
     },

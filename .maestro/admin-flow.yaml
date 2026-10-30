@@ -1,7 +1,10 @@
 # Admin-role screenshot walkthrough: login -> every tab in AdminTabs
 # (navigation/AdminTabs.tsx, verified against the current tab list, not
-# assumed): Orders (Admin Dashboard), Catalogue, Customers, Ledger,
-# Branches, Staff. Read-only navigation only — no data is created or
+# assumed): Orders (Admin Dashboard), Catalogue, Customers, Ledger —
+# icon-only now, tapped by tabBarButtonTestID since there's no label text
+# to tap on. Branches/Staff moved out of the tab bar into the Setup screen
+# (reached via the Overview header's Setup icon) — see AdminStack.tsx/
+# SetupScreen.tsx. Read-only navigation only — no data is created or
 # changed by this flow, unlike staff-flow.yaml.
 #
 # Run via `npm run screenshots` in /mobile — see /mobile/.maestro/README.md
@@ -33,18 +36,31 @@ appId: ${MAESTRO_APP_ID}
 - assertVisible: "Overview"
 - takeScreenshot: 02_admin_dashboard
 
-- tapOn: "Catalogue"
+- tapOn:
+    id: "tab-catalogue"
 - assertVisible: "Garment Catalogue"
 - takeScreenshot: 03_garment_catalogue
 
-- tapOn: "Customers"
+- tapOn:
+    id: "tab-customers"
 - takeScreenshot: 04_customer_management
 
-- tapOn: "Ledger"
+- tapOn:
+    id: "tab-ledger"
 - takeScreenshot: 05_ledger_aging
 
+- tapOn:
+    id: "tab-orders"
+- tapOn:
+    id: "setup-button"
+- assertVisible: "Setup"
+- takeScreenshot: 06_setup
+
 - tapOn: "Branches"
-- takeScreenshot: 06_branches
+- takeScreenshot: 07_branches
+- back
+- tapOn:
+    id: "setup-button"
 
 - tapOn: "Staff"
-- takeScreenshot: 07_staff_management
+- takeScreenshot: 08_staff_management

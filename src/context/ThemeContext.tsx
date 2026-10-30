@@ -17,13 +17,13 @@ const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
 // Mirrors AuthContext.tsx's conventions (SecureStore persistence, best-effort
 // try/catch that never blocks). Unlike auth, there's no "loading" gate before
-// first paint — the default ('light', per the client's confirmed choice)
-// renders immediately, and flips to the stored preference once the restore
-// resolves. A returning dark-mode user sees a brief light flash before it
-// corrects; simpler than adding a second splash-gating condition to App.tsx
-// for a preference that isn't security- or correctness-critical.
+// first paint — the default ('dark') renders immediately, and flips to the
+// stored preference once the restore resolves. A returning light-mode user
+// sees a brief dark flash before it corrects; simpler than adding a second
+// splash-gating condition to App.tsx for a preference that isn't security-
+// or correctness-critical.
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [mode, setModeState] = useState<ThemeMode>('light');
+  const [mode, setModeState] = useState<ThemeMode>('dark');
 
   useEffect(() => {
     (async () => {

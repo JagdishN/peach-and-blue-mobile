@@ -6,7 +6,7 @@ import { AppScreen } from '../../components/AppScreen';
 import { PriceChip } from '../../components/PriceChip';
 import { useTheme } from '../../context/ThemeContext';
 import { fetchAgingReport, sendReminder, AgingRow } from '../../api/ledger';
-import { ColorTokens, fonts, radii, spacing } from '../../theme/theme';
+import { ColorTokens, fonts, radii, spacing, typography } from '../../theme/theme';
 import type { AdminStackParamList } from '../../navigation/AdminStack';
 
 type Nav = NativeStackNavigationProp<AdminStackParamList>;
@@ -64,7 +64,7 @@ export const LedgerAgingScreen: React.FC = () => {
             {rows.map((row) => (
               <View key={row.customerId} style={styles.card}>
                 <View style={styles.cardRow}>
-                  <View>
+                  <View style={styles.cardTitleWrap}>
                     <Text style={styles.cardTitle}>
                       {row.locationLabel} · {row.customerName}
                     </Text>
@@ -121,11 +121,11 @@ const createStyles = (colors: ColorTokens) =>
     title: {
       fontFamily: fonts.headingSemiBold,
       fontWeight: '600',
-      fontSize: 16,
+      fontSize: typography.screenHeading,
       color: colors.cream,
     },
     subtitle: {
-      fontSize: 10,
+      fontSize: typography.secondary,
       color: '#C8A67B',
       marginTop: 2,
     },
@@ -154,15 +154,19 @@ const createStyles = (colors: ColorTokens) =>
       justifyContent: 'space-between',
       alignItems: 'center',
     },
+    cardTitleWrap: {
+      flex: 1,
+      marginRight: spacing.sm,
+    },
     cardTitle: {
-      fontSize: 12.5,
+      fontSize: typography.cardHeading,
       fontWeight: '700',
       color: colors.navyText,
     },
     cardSub: {
-      fontSize: 10.5,
+      fontSize: typography.secondary,
       color: colors.muted,
-      marginTop: 2,
+      marginTop: 3,
     },
     remindButton: {
       borderWidth: 1.5,
@@ -178,10 +182,10 @@ const createStyles = (colors: ColorTokens) =>
     remindButtonText: {
       color: colors.navyDeep,
       fontWeight: '700',
-      fontSize: 10.5,
+      fontSize: typography.button,
     },
     empty: {
-      fontSize: 11,
+      fontSize: typography.body,
       color: colors.muted,
       marginTop: spacing.lg,
       textAlign: 'center',

@@ -3,6 +3,7 @@ import { Alert, ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Swi
 import { Picker } from '@react-native-picker/picker';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AppScreen } from '../../components/AppScreen';
 import { NivenxaFooter } from '../../components/BrandComponents';
 import { SanitizedTextInput } from '../../components/SanitizedTextInput';
@@ -13,7 +14,7 @@ import { ApiError } from '../../api/client';
 import { fetchUsers, createUser, updateUser, deleteUser, StaffUser, UserRole } from '../../api/users';
 import { fetchBranches, Branch } from '../../api/branches';
 import { getDisplayName } from '../../utils/displayName';
-import { ColorTokens, fonts, radii, spacing, withOpacity } from '../../theme/theme';
+import { ColorTokens, fonts, radii, spacing, typography, withOpacity } from '../../theme/theme';
 import type { AdminStackParamList } from '../../navigation/AdminStack';
 
 const UNSCOPED_KEY = '__unscoped__';
@@ -178,7 +179,14 @@ export const StaffManagementScreen: React.FC = () => {
   return (
     <AppScreen scroll={false}>
       <View style={styles.appbar}>
-        <Text style={styles.title}>Staff & Admin Accounts</Text>
+        {/* Now reached via Setup (pushed from the stack), not a tab root —
+            needs its own back affordance, same convention as SettingsScreen. */}
+        <View style={styles.appbarTopRow}>
+          <Pressable style={styles.backButton} onPress={() => navigation.goBack()} hitSlop={8}>
+            <MaterialCommunityIcons name="chevron-left" size={22} color={colors.cream} />
+          </Pressable>
+          <Text style={styles.title}>Staff & Admin Accounts</Text>
+        </View>
         <Text style={styles.subtitle}>{users.length} total · Admin-only, no passwords (OTP login)</Text>
       </View>
 
@@ -228,6 +236,10 @@ export const StaffManagementScreen: React.FC = () => {
       <Modal visible={creating} transparent animationType="slide" onRequestClose={() => setCreating(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
+            {/* See BranchesScreen.tsx's identical comment — larger field
+                text now makes this card's fixed maxHeight a real risk of
+                hiding Save/Cancel on a short device without this. */}
+            <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
             <Text style={styles.modalTitle}>{editingUserId ? 'Edit Staff / Admin' : 'Add Staff / Admin'}</Text>
 
             <Text style={styles.fieldLabel}>Name</Text>
@@ -287,6 +299,7 @@ export const StaffManagementScreen: React.FC = () => {
             <Pressable style={styles.cancelButton} onPress={() => setCreating(false)}>
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </Pressable>
+            </ScrollView>
           </View>
           <NivenxaFooter />
         </View>
@@ -304,10 +317,11 @@ const createStyles = (colors: ColorTokens) =>
     },
     appbarTopRow: {
       flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'flex-start',
+      alignItems: 'center',
+      gap: spacing.sm,
+      flexWrap: 'wrap',
     },
-    settingsButton: {
+    backButton: {
       width: 28,
       height: 28,
       borderRadius: radii.pill,
@@ -315,18 +329,20 @@ const createStyles = (colors: ColorTokens) =>
       alignItems: 'center',
       justifyContent: 'center',
     },
-    settingsButtonText: {
-      fontSize: 14,
-      color: colors.cream,
-    },
+    // Review finding: "Staff & Admin Accounts" at 24sp next to the 28px
+    // back button, with no shrink/wrap, would clip on a narrow device or
+    // under Android's larger-text accessibility setting. flexShrink lets it
+    // compress; appbarTopRow's flexWrap above is the fallback if it still
+    // doesn't fit at all (wraps below the back button rather than clipping).
     title: {
+      flexShrink: 1,
       fontFamily: fonts.headingSemiBold,
       fontWeight: '600',
-      fontSize: 16,
+      fontSize: typography.screenHeading,
       color: colors.cream,
     },
     subtitle: {
-      fontSize: 10,
+      fontSize: typography.secondary,
       color: '#C8A67B',
       marginTop: 2,
     },
@@ -343,7 +359,7 @@ const createStyles = (colors: ColorTokens) =>
       minHeight: 0,
     },
     sectionHeader: {
-      fontSize: 10.5,
+      fontSize: typography.caption,
       fontWeight: '800',
       textTransform: 'uppercase',
       letterSpacing: 0.4,
@@ -371,12 +387,13 @@ const createStyles = (colors: ColorTokens) =>
       flexShrink: 1,
     },
     userName: {
-      fontSize: 12,
+      flexShrink: 1,
+      fontSize: typography.cardHeading,
       fontWeight: '700',
       color: colors.navyText,
     },
     cardSub: {
-      fontSize: 10.5,
+      fontSize: typography.secondary,
       color: colors.muted,
       marginTop: 3,
     },
@@ -387,8 +404,8 @@ const createStyles = (colors: ColorTokens) =>
       marginTop: spacing.sm,
     },
     inlineAction: {
-      paddingVertical: 6,
-      paddingHorizontal: 10,
+      paddingVertical: 8,
+      paddingHorizontal: 12,
       borderRadius: radii.md,
       borderWidth: 1,
       borderColor: colors.border,
@@ -400,11 +417,11 @@ const createStyles = (colors: ColorTokens) =>
     },
     inlineActionText: {
       color: colors.navyText,
-      fontSize: 10,
+      fontSize: typography.button,
       fontWeight: '700',
     },
     empty: {
-      fontSize: 11,
+      fontSize: typography.body,
       color: colors.muted,
       marginTop: spacing.lg,
       textAlign: 'center',
@@ -419,7 +436,7 @@ const createStyles = (colors: ColorTokens) =>
     addButtonText: {
       color: colors.white,
       fontWeight: '700',
-      fontSize: 11.5,
+      fontSize: typography.button,
     },
     modalOverlay: {
       flex: 1,
@@ -436,19 +453,19 @@ const createStyles = (colors: ColorTokens) =>
     modalTitle: {
       fontFamily: fonts.headingSemiBold,
       fontWeight: '600',
-      fontSize: 15,
+      fontSize: typography.sectionHeading,
       color: colors.navyDeep,
       marginBottom: spacing.md,
     },
     fieldLabel: {
-      fontSize: 9.5,
+      fontSize: typography.formLabel,
       fontWeight: '700',
       color: colors.navyText,
       marginTop: spacing.sm,
       marginBottom: spacing.xs,
     },
     hintInline: {
-      fontSize: 9,
+      fontSize: typography.caption,
       fontWeight: '400',
       color: colors.muted,
       textTransform: 'none',
@@ -460,7 +477,7 @@ const createStyles = (colors: ColorTokens) =>
       borderRadius: radii.md,
       paddingVertical: spacing.sm,
       paddingHorizontal: spacing.md,
-      fontSize: 13,
+      fontSize: typography.formValue,
       color: colors.navyText,
       marginBottom: spacing.xs,
     },
@@ -471,7 +488,7 @@ const createStyles = (colors: ColorTokens) =>
       marginBottom: spacing.sm,
     },
     switchLabel: {
-      fontSize: 11.5,
+      fontSize: typography.formLabel,
       fontWeight: '700',
       color: colors.navyText,
     },
@@ -488,7 +505,7 @@ const createStyles = (colors: ColorTokens) =>
     },
     error: {
       color: colors.danger,
-      fontSize: 11,
+      fontSize: typography.secondary,
       marginBottom: spacing.sm,
     },
     saveButton: {
@@ -504,7 +521,7 @@ const createStyles = (colors: ColorTokens) =>
     saveButtonText: {
       color: colors.white,
       fontWeight: '700',
-      fontSize: 12,
+      fontSize: typography.button,
     },
     cancelButton: {
       alignItems: 'center',
@@ -512,6 +529,6 @@ const createStyles = (colors: ColorTokens) =>
     },
     cancelButtonText: {
       color: colors.muted,
-      fontSize: 11,
+      fontSize: typography.secondary,
     },
   });

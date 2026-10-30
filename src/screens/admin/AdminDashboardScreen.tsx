@@ -2,7 +2,9 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AppScreen } from '../../components/AppScreen';
+import { AccountMenuButton, AccountMenuModal, useAccountMenu } from '../../components/AccountMenu';
 import { PriceChip } from '../../components/PriceChip';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -10,7 +12,7 @@ import { fetchBranch, Branch } from '../../api/branches';
 import { fetchSummary, ReportSummary } from '../../api/reports';
 import { fetchAgingReport, AgingRow } from '../../api/ledger';
 import { listOrders, Order } from '../../api/orders';
-import { ColorTokens, fonts, radii, spacing } from '../../theme/theme';
+import { ColorTokens, fonts, radii, spacing, typography } from '../../theme/theme';
 import type { AdminStackParamList } from '../../navigation/AdminStack';
 
 type Nav = NativeStackNavigationProp<AdminStackParamList>;
@@ -26,6 +28,7 @@ export const AdminDashboardScreen: React.FC = () => {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const user = state.status === 'signedIn' ? state.user : null;
+  const menu = useAccountMenu();
 
   const [branch, setBranch] = useState<Branch | null>(null);
   const [summary, setSummary] = useState<ReportSummary | null>(null);
@@ -62,18 +65,33 @@ export const AdminDashboardScreen: React.FC = () => {
   );
 
   return (
-    <AppScreen scroll={false}>
+    <AppScreen scroll={false} avatarInHeader>
       <View style={styles.appbar}>
         <View style={styles.appbarTopRow}>
-          <View>
+          <View style={styles.titleWrap}>
             <Text style={styles.title}>Overview</Text>
             <Text style={styles.subtitle}>Today, {todayLabel()}</Text>
+          </View>
+          <View style={styles.headerIcons}>
+            <Pressable
+              testID="setup-button"
+              accessibilityRole="button"
+              accessibilityLabel="Setup"
+              style={styles.setupButton}
+              onPress={() => navigation.navigate('Setup')}
+              hitSlop={8}
+            >
+              <MaterialCommunityIcons name="cog-outline" size={22} color="#fff" />
+            </Pressable>
+            <AccountMenuButton menu={menu} />
           </View>
         </View>
         <View style={styles.branchChip}>
           <Text style={styles.branchChipText}>{user?.branchId ? branch?.branchName ?? '…' : 'All Branches ▾'}</Text>
         </View>
       </View>
+
+      <AccountMenuModal menu={menu} />
 
       <View style={styles.body}>
         {loading || !summary ? (
@@ -125,7 +143,12 @@ const StatCard: React.FC<{ num: number | string; label: string; styles: ReturnTy
   styles,
 }) => (
   <View style={styles.statCard}>
-    <Text style={styles.statNum}>{num}</Text>
+    {/* 30sp bold in a half-width card risks clipping a large currency
+        amount (e.g. "₹1,25,000") — shrink-to-fit rather than let it
+        overflow the card or wrap mid-number. */}
+    <Text style={styles.statNum} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+      {num}
+    </Text>
     <Text style={styles.statLabel}>{label}</Text>
   </View>
 );
@@ -140,16 +163,38 @@ const createStyles = (colors: ColorTokens) =>
     appbarTopRow: {
       flexDirection: 'row',
       justifyContent: 'space-between',
-      alignItems: 'flex-start',
+      alignItems: 'center',
+    },
+    // Review finding (typography pass follow-up): at 24sp, plus Android's
+    // accessibility font-scaling multiplying that further, "Overview" +
+    // today's date could get wide enough to collide with the Setup/Avatar
+    // icons on the right, which have no flex of their own. flex:1 here
+    // means this block shrinks/wraps first instead of pushing them off.
+    titleWrap: {
+      flex: 1,
+      marginRight: spacing.sm,
+    },
+    headerIcons: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+    },
+    setupButton: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: 'rgba(16, 24, 40, 0.18)',
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     title: {
       fontFamily: fonts.headingSemiBold,
       fontWeight: '600',
-      fontSize: 16,
+      fontSize: typography.screenHeading,
       color: colors.cream,
     },
     subtitle: {
-      fontSize: 10,
+      fontSize: typography.formLabel,
       color: '#C8A67B',
       marginTop: 2,
     },
@@ -159,12 +204,12 @@ const createStyles = (colors: ColorTokens) =>
       borderWidth: 1,
       borderColor: 'rgba(255,255,255,0.25)',
       borderRadius: radii.pill,
-      paddingVertical: 3,
-      paddingHorizontal: 9,
+      paddingVertical: 5,
+      paddingHorizontal: 11,
       marginTop: spacing.sm,
     },
     branchChipText: {
-      fontSize: 8.5,
+      fontSize: typography.formLabel,
       fontWeight: '700',
       color: colors.cream,
     },
@@ -184,23 +229,23 @@ const createStyles = (colors: ColorTokens) =>
       borderWidth: 1,
       borderColor: colors.border,
       borderRadius: radii.lg,
-      padding: 11,
+      padding: 13,
     },
     statNum: {
       fontFamily: fonts.heading,
       fontWeight: '700',
-      fontSize: 18,
+      fontSize: typography.metric,
       color: colors.navyDeep,
     },
     statLabel: {
-      fontSize: 9,
+      fontSize: typography.formLabel,
       color: colors.muted,
       fontWeight: '600',
-      marginTop: 2,
+      marginTop: 4,
     },
     sectionTitle: {
-      fontSize: 12.5,
-      fontWeight: '700',
+      fontSize: typography.sectionHeading,
+      fontWeight: '600',
       color: colors.navyText,
       marginVertical: spacing.sm,
     },
@@ -214,9 +259,11 @@ const createStyles = (colors: ColorTokens) =>
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
+      gap: spacing.sm,
     },
     attentionText: {
-      fontSize: 11,
+      flex: 1,
+      fontSize: typography.formLabel,
       fontWeight: '700',
       color: colors.navyText,
     },
@@ -224,14 +271,14 @@ const createStyles = (colors: ColorTokens) =>
       backgroundColor: colors.peachPrimary,
       color: colors.white,
       fontWeight: '800',
-      fontSize: 10.5,
+      fontSize: typography.caption,
       paddingVertical: 4,
       paddingHorizontal: 10,
       borderRadius: radii.pill,
       overflow: 'hidden',
     },
     empty: {
-      fontSize: 11,
+      fontSize: typography.secondary,
       color: colors.muted,
     },
   });

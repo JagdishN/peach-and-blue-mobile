@@ -8,7 +8,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { fetchBranch, Branch } from '../../api/branches';
 import { listOrders, Order, InternalStatus } from '../../api/orders';
 import { getDisplayName } from '../../utils/displayName';
-import { ColorTokens, fonts, radii, spacing } from '../../theme/theme';
+import { ColorTokens, fonts, radii, spacing, typography } from '../../theme/theme';
 import type { StaffStackParamList } from '../../navigation/StaffStack';
 
 type Nav = NativeStackNavigationProp<StaffStackParamList, 'StaffHome'>;
@@ -93,7 +93,7 @@ export const StaffHomeScreen: React.FC = () => {
                   onPress={() => navigation.navigate('OrderStatus', { orderId: order.id })}
                 >
                   <View style={styles.cardRow}>
-                    <View>
+                    <View style={styles.cardTitleWrap}>
                       <Text style={styles.cardTitle}>
                         {order.customer.locationLabel} · {order.customer.fullName}
                       </Text>
@@ -130,11 +130,11 @@ const createStyles = (colors: ColorTokens) =>
     title: {
       fontFamily: fonts.headingSemiBold,
       fontWeight: '600',
-      fontSize: 16,
+      fontSize: typography.screenHeading,
       color: colors.cream,
     },
     subtitle: {
-      fontSize: 12,
+      fontSize: typography.secondary,
       color: '#C8A67B',
       marginTop: 2,
     },
@@ -149,7 +149,7 @@ const createStyles = (colors: ColorTokens) =>
       marginTop: spacing.sm,
     },
     branchChipText: {
-      fontSize: 10.5,
+      fontSize: typography.formLabel,
       fontWeight: '700',
       color: colors.cream,
     },
@@ -178,21 +178,25 @@ const createStyles = (colors: ColorTokens) =>
       justifyContent: 'space-between',
       alignItems: 'center',
     },
+    cardTitleWrap: {
+      flex: 1,
+      marginRight: spacing.sm,
+    },
     cardTitle: {
-      fontSize: 13.5,
+      fontSize: typography.cardHeading,
       fontWeight: '700',
       color: colors.navyText,
     },
     cardSub: {
-      fontSize: 12,
+      fontSize: typography.secondary,
       color: colors.muted,
-      marginTop: 2,
+      marginTop: 3,
     },
     badge: {
-      fontSize: 10,
+      fontSize: typography.caption,
       fontWeight: '800',
-      paddingVertical: 2,
-      paddingHorizontal: 7,
+      paddingVertical: 3,
+      paddingHorizontal: 8,
       borderRadius: radii.pill,
       overflow: 'hidden',
     },
@@ -218,10 +222,11 @@ const createStyles = (colors: ColorTokens) =>
     newOrderButtonText: {
       color: colors.white,
       fontWeight: '700',
-      fontSize: 11.5,
+      fontSize: typography.button,
     },
     error: {
       color: colors.danger,
+      fontSize: typography.secondary,
       textAlign: 'center',
       marginTop: spacing.xl,
     },
