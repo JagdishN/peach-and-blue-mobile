@@ -89,9 +89,15 @@ export const OrderStatusScreen: React.FC = () => {
   const [assigning, setAssigning] = useState(false);
   const [assignError, setAssignError] = useState<string | null>(null);
 
-  // CLAUDE.md "Payment marking — real gap" — only relevant for the
-  // pending -> delivered transition on a daily-billing customer.
+  // CLAUDE.md "Payment marking" — CHANGED (2026-10-30, client request):
+  // delivery and payment are now two independent staff actions, not one
+  // bundled "Mark Delivered & Payment Received" button — a customer may not
+  // pay at the moment of delivery. recordingPayment/paymentError are kept
+  // separate from updating/error (the status-advance action) so the two
+  // actions' loading/error states don't bleed into each other.
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod | null>(null);
+  const [recordingPayment, setRecordingPayment] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
 
   const loadOrder = useCallback(async () => {
     setLoading(true);
@@ -132,17 +138,16 @@ export const OrderStatusScreen: React.FC = () => {
     }
   };
 
-  // A daily-billing order needs a payment method picked before the
-  // delivered transition fires; a monthly-billing order is settled via the
-  // ledger instead (orderService.ts's billingMode branch), so there's
-  // nothing to pick. Reads order.billingMode (this order's own snapshot
-  // from creation time), NOT order.customer.billingMode — CLAUDE.md
+  // A daily-billing order not yet marked paid can have payment recorded at
+  // any time — before, during, or after delivery (CLAUDE.md "Payment
+  // marking", changed 2026-10-30 per client request: delivery and payment
+  // used to be forced into the same moment, since the customer may not pay
+  // immediately at delivery). Reads order.billingMode (this order's own
+  // snapshot from creation time), NOT order.customer.billingMode — CLAUDE.md
   // "Monthly billing retroactivity — RESOLVED": the customer's current
   // setting can have changed since this order was created, and must not
   // retroactively change how this specific order is settled.
-  const requiresPaymentMethod =
-    order?.billingMode !== 'monthly_billing' &&
-    STATUS_SEQUENCE[STATUS_SEQUENCE.indexOf(order?.internalStatus ?? 'picked_up') + 1] === 'delivered';
+  const canRecordPayment = order?.billingMode !== 'monthly_billing' && order?.paymentStatus !== 'paid';
 
   const handleAdvanceStatus = async () => {
     if (!order) return;
@@ -150,27 +155,31 @@ export const OrderStatusScreen: React.FC = () => {
     const next = STATUS_SEQUENCE[currentIndex + 1];
     if (!next) return;
 
-    if (next === 'delivered' && requiresPaymentMethod && !selectedPaymentMethod) {
-      setError('Select how the customer paid before marking this order delivered.');
-      return;
-    }
-
     setUpdating(true);
     setError(null);
     try {
-      // CLAUDE.md order workflow step 7: "verifies payment status and marks
-      // the order both Delivered and Payment Received" — one bundled action,
-      // not two separate screens. Payment recorded first so a failure there
-      // doesn't leave the order marked delivered with no payment logged.
-      if (next === 'delivered' && requiresPaymentMethod && selectedPaymentMethod) {
-        await recordOrderPayment(order.id, selectedPaymentMethod);
-      }
       const updated = await updateOrderStatus(order.id, next);
       setOrder(updated);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not update status.');
     } finally {
       setUpdating(false);
+    }
+  };
+
+  const handleRecordPayment = async () => {
+    if (!order || !selectedPaymentMethod) return;
+
+    setRecordingPayment(true);
+    setPaymentError(null);
+    try {
+      const updated = await recordOrderPayment(order.id, selectedPaymentMethod);
+      setOrder(updated);
+      setSelectedPaymentMethod(null);
+    } catch (err) {
+      setPaymentError(err instanceof ApiError ? err.message : 'Could not record payment.');
+    } finally {
+      setRecordingPayment(false);
     }
   };
 
@@ -251,8 +260,20 @@ export const OrderStatusScreen: React.FC = () => {
 
         {error && <Text style={styles.error}>{error}</Text>}
 
-        {nextLabel === 'Delivered' && requiresPaymentMethod && (
-          <View style={styles.paymentMethodBlock}>
+        {nextLabel && (
+          <Pressable style={[styles.advanceButton, updating && styles.advanceButtonDisabled]} onPress={handleAdvanceStatus} disabled={updating}>
+            {updating ? <ActivityIndicator color={colors.white} /> : <Text style={styles.advanceButtonText}>Mark as {nextLabel}</Text>}
+          </Pressable>
+        )}
+
+        {/* CLAUDE.md "Payment marking" — independent of delivery status
+            (client request, 2026-10-30): the customer may not pay at the
+            moment of delivery, so this is its own action, not gated on
+            marking the order delivered. */}
+        {canRecordPayment && (
+          <View style={styles.revisionCard}>
+            <Text style={styles.sectionTitle}>Record Payment</Text>
+
             <Text style={styles.fieldLabel}>Payment Method</Text>
             <View style={styles.toggleRow}>
               {PAYMENT_METHOD_OPTIONS.map((option) => (
@@ -269,19 +290,24 @@ export const OrderStatusScreen: React.FC = () => {
                 </Pressable>
               ))}
             </View>
-          </View>
-        )}
 
-        {nextLabel && (
-          <Pressable style={[styles.advanceButton, updating && styles.advanceButtonDisabled]} onPress={handleAdvanceStatus} disabled={updating}>
-            {updating ? (
-              <ActivityIndicator color={colors.white} />
-            ) : (
-              <Text style={styles.advanceButtonText}>
-                {nextLabel === 'Delivered' ? 'Mark Delivered & Payment Received' : `Mark as ${nextLabel}`}
-              </Text>
-            )}
-          </Pressable>
+            {paymentError && <Text style={styles.error}>{paymentError}</Text>}
+
+            <Pressable
+              style={[
+                styles.advanceButton,
+                (recordingPayment || !selectedPaymentMethod) && styles.advanceButtonDisabled,
+              ]}
+              onPress={handleRecordPayment}
+              disabled={recordingPayment || !selectedPaymentMethod}
+            >
+              {recordingPayment ? (
+                <ActivityIndicator color={colors.white} />
+              ) : (
+                <Text style={styles.advanceButtonText}>Record Payment</Text>
+              )}
+            </Pressable>
+          </View>
         )}
 
         {user?.role === 'admin' && (
@@ -432,9 +458,6 @@ const createStyles = (colors: ColorTokens) =>
       color: colors.white,
       fontWeight: '700',
       fontSize: 11.5,
-    },
-    paymentMethodBlock: {
-      marginTop: spacing.sm,
     },
     revisionCard: {
       backgroundColor: colors.peachCard,
