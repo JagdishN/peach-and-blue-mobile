@@ -88,13 +88,62 @@ export const updateOrderStatus = (id: string, status: InternalStatus) =>
     (res) => res.order
   );
 
+// Payment-safety review (2026-10-30): outstanding/collected/allocated, in
+// rupees (the backend converts from its internal paise representation
+// before responding — mobile never deals with paise directly).
+export interface InvoicePaymentSummary {
+  required?: number;
+  outstanding: number;
+  collected: number;
+  allocated: number;
+  status: 'unpaid' | 'partially_paid' | 'paid';
+  byMethod?: Record<string, number>;
+}
+
+export const fetchInvoicePaymentSummary = (orderId: string) =>
+  apiRequest<{ paymentSummary: InvoicePaymentSummary }>(`/api/v1/orders/${orderId}/payment-summary`).then(
+    (res) => res.paymentSummary
+  );
+
+// Lightweight, client-generated, not cryptographically meaningful — just
+// needs to be unique per Record Payment attempt so a double-tap (or a
+// retried request after a dropped response) sends the SAME key twice,
+// which the backend recognizes and treats as a no-op rather than a second
+// real receipt. Not a real UUID library on purpose — nothing here needs
+// that level of rigor, just uniqueness.
+export const generateIdempotencyKey = (): string =>
+  `${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
+
 // CLAUDE.md "Payment marking — real gap" — bundled into the same delivery
 // action as updateOrderStatus(id, 'delivered'), not a separate screen.
-export const recordOrderPayment = (id: string, paymentMethod: PaymentMethod) =>
-  apiRequest<{ order: Order }>(`/api/v1/orders/${id}/payment`, {
-    method: 'PATCH',
-    body: { paymentMethod },
-  }).then((res) => res.order);
+// REWORKED (2026-10-30, payment-safety review section 6/12): now supports a
+// partial `amount` (omit to pay the full outstanding balance, preserving
+// the old one-tap UX) and requires an `idempotencyKey` so a double-tap
+// can't create a second real receipt. Response now also carries the
+// updated paymentSummary and an `overpayment` flag.
+export const recordOrderPayment = (
+  id: string,
+  paymentMethod: PaymentMethod,
+  options: { amount?: number; idempotencyKey: string }
+) =>
+  apiRequest<{ order: Order; paymentSummary: InvoicePaymentSummary; overpayment: boolean }>(
+    `/api/v1/orders/${id}/payment`,
+    {
+      method: 'PATCH',
+      body: { paymentMethod, amount: options.amount, idempotencyKey: options.idempotencyKey },
+    }
+  );
+
+// Payment-safety review section 7 (Static Bank UPI Workflow, Stage A) —
+// staff reports a transfer they believe landed on the business's static QR
+// code; stays `pending` (shown in the Payment History below as "awaiting
+// verification") until an admin verifies it (verifyBankUpiPayment, admin-
+// only, not called from mobile staff screens).
+export const reportBankUpiPayment = (orderId: string, amount: number, utrReference: string, notes?: string) =>
+  apiRequest<{ payment: { id: string } }>(`/api/v1/orders/${orderId}/bank-upi-report`, {
+    method: 'POST',
+    body: { amount, utrReference, notes },
+  }).then((res) => res.payment);
 
 export const reviseOrderAmount = (id: string, newAmount: number, reason: string) =>
   apiRequest<{ order: Order }>(`/api/v1/orders/${id}/amount`, {

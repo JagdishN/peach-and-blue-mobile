@@ -54,6 +54,21 @@ export const SetupScreen: React.FC = () => {
           </View>
           <MaterialCommunityIcons name="chevron-right" size={20} color={colors.muted} />
         </Pressable>
+
+        {/* Third-party vendor invoice management, spec section 8:
+            "Settings/Setup → Vendor Invoices → Vendor Invoice Register →
+            Add New/Edit." Internal expense tracking only — fully separate
+            from the customer-facing Orders/Catalogue/Customers/Ledger tabs. */}
+        <Pressable style={styles.card} onPress={() => navigation.navigate('VendorInvoices')}>
+          <View style={styles.cardIcon}>
+            <MaterialCommunityIcons name="truck-outline" size={24} color={colors.peachPrimaryDark} />
+          </View>
+          <View style={styles.cardTextWrap}>
+            <Text style={styles.cardTitle}>Vendor Invoices</Text>
+            <Text style={styles.cardSub}>Track third-party vendor expenses</Text>
+          </View>
+          <MaterialCommunityIcons name="chevron-right" size={20} color={colors.muted} />
+        </Pressable>
       </View>
     </AppScreen>
   );

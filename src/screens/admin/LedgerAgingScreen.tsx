@@ -6,20 +6,41 @@ import { AppScreen } from '../../components/AppScreen';
 import { PriceChip } from '../../components/PriceChip';
 import { useTheme } from '../../context/ThemeContext';
 import { fetchAgingReport, sendReminder, AgingRow } from '../../api/ledger';
+import { fetchInvoiceAgingReport, InvoiceAgingRow } from '../../api/outstanding';
 import { ColorTokens, fonts, radii, spacing, typography } from '../../theme/theme';
 import type { AdminStackParamList } from '../../navigation/AdminStack';
 
 type Nav = NativeStackNavigationProp<AdminStackParamList>;
+
+// Outstanding-dues rework, section 10: "Adapt this structure to the
+// current navigation rather than creating redundant screens" — Monthly
+// Billing (the existing, separate running-balance model) and Outstanding
+// Payments (the new per-invoice model) live as two segments of this SAME
+// Ledger tab, not two new bottom-nav items.
+type LedgerSegment = 'monthly_billing' | 'outstanding_payments';
+
+interface CustomerOutstandingSummary {
+  customerId: string;
+  customerName: string;
+  branchName: string;
+  totalOutstanding: number;
+  invoiceCount: number;
+}
 
 export const LedgerAgingScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
+  const [segment, setSegment] = useState<LedgerSegment>('monthly_billing');
+
   const [rows, setRows] = useState<AgingRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [reminding, setReminding] = useState<string | null>(null);
   const [sentFor, setSentFor] = useState<string | null>(null);
+
+  const [outstandingRows, setOutstandingRows] = useState<InvoiceAgingRow[]>([]);
+  const [outstandingLoading, setOutstandingLoading] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -30,10 +51,20 @@ export const LedgerAgingScreen: React.FC = () => {
     }
   }, []);
 
+  const loadOutstanding = useCallback(async () => {
+    setOutstandingLoading(true);
+    try {
+      setOutstandingRows(await fetchInvoiceAgingReport());
+    } finally {
+      setOutstandingLoading(false);
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       load();
-    }, [load])
+      loadOutstanding();
+    }, [load, loadOutstanding])
   );
 
   const handleRemind = async (customerId: string) => {
@@ -47,45 +78,114 @@ export const LedgerAgingScreen: React.FC = () => {
     }
   };
 
+  // Backend returns one row per invoice — group by customer for this
+  // dashboard-level list (per-invoice detail lives on the customer's own
+  // screen, reached by tapping a card below).
+  const customerSummaries = useMemo<CustomerOutstandingSummary[]>(() => {
+    const byCustomer = new Map<string, CustomerOutstandingSummary>();
+    for (const row of outstandingRows) {
+      if (row.outstanding <= 0) continue;
+      const existing = byCustomer.get(row.customerId);
+      if (existing) {
+        existing.totalOutstanding += row.outstanding;
+        existing.invoiceCount += 1;
+      } else {
+        byCustomer.set(row.customerId, {
+          customerId: row.customerId,
+          customerName: row.customerName,
+          branchName: row.branchName,
+          totalOutstanding: row.outstanding,
+          invoiceCount: 1,
+        });
+      }
+    }
+    return Array.from(byCustomer.values()).sort((a, b) => b.totalOutstanding - a.totalOutstanding);
+  }, [outstandingRows]);
+
   return (
     <AppScreen scroll={false}>
       <View style={styles.appbar}>
-        <Text style={styles.title}>Monthly Billing Ledger</Text>
-        <Text style={styles.subtitle}>Sorted by days overdue</Text>
+        <Text style={styles.title}>Ledger</Text>
+        <View style={styles.segmentRow}>
+          <Pressable
+            style={[styles.segment, segment === 'monthly_billing' && styles.segmentActive]}
+            onPress={() => setSegment('monthly_billing')}
+          >
+            <Text style={[styles.segmentText, segment === 'monthly_billing' && styles.segmentTextActive]}>
+              Monthly Billing
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[styles.segment, segment === 'outstanding_payments' && styles.segmentActive]}
+            onPress={() => setSegment('outstanding_payments')}
+          >
+            <Text style={[styles.segmentText, segment === 'outstanding_payments' && styles.segmentTextActive]}>
+              Outstanding Payments
+            </Text>
+          </Pressable>
+        </View>
       </View>
 
       <View style={styles.body}>
-        {loading ? (
+        {segment === 'monthly_billing' ? (
+          loading ? (
+            <ActivityIndicator color={colors.peachPrimary} style={{ marginTop: spacing.xl }} />
+          ) : rows.length === 0 ? (
+            <Text style={styles.empty}>No monthly-billing customers with an outstanding balance.</Text>
+          ) : (
+            <ScrollView style={styles.listScroll} showsVerticalScrollIndicator={false}>
+              {rows.map((row) => (
+                <View key={row.customerId} style={styles.card}>
+                  <View style={styles.cardRow}>
+                    <View style={styles.cardTitleWrap}>
+                      <Text style={styles.cardTitle}>
+                        {row.locationLabel} · {row.customerName}
+                      </Text>
+                      <Text style={styles.cardSub}>{row.daysSinceLastCharge ?? 0} days overdue</Text>
+                    </View>
+                    <PriceChip amount={row.outstandingBalance} />
+                  </View>
+                  <Pressable
+                    style={[styles.remindButton, reminding === row.customerId && styles.remindButtonDisabled]}
+                    onPress={() => handleRemind(row.customerId)}
+                    disabled={reminding === row.customerId}
+                  >
+                    {reminding === row.customerId ? (
+                      <ActivityIndicator color={colors.navyDeep} />
+                    ) : (
+                      <Text style={styles.remindButtonText}>
+                        {sentFor === row.customerId ? 'Reminder Sent ✓' : 'Send WhatsApp Reminder'}
+                      </Text>
+                    )}
+                  </Pressable>
+                </View>
+              ))}
+            </ScrollView>
+          )
+        ) : outstandingLoading ? (
           <ActivityIndicator color={colors.peachPrimary} style={{ marginTop: spacing.xl }} />
-        ) : rows.length === 0 ? (
-          <Text style={styles.empty}>No monthly-billing customers with an outstanding balance.</Text>
+        ) : customerSummaries.length === 0 ? (
+          <Text style={styles.empty}>No customers with an outstanding order balance.</Text>
         ) : (
           <ScrollView style={styles.listScroll} showsVerticalScrollIndicator={false}>
-            {rows.map((row) => (
-              <View key={row.customerId} style={styles.card}>
+            {customerSummaries.map((summary) => (
+              <Pressable
+                key={summary.customerId}
+                style={styles.card}
+                onPress={() => navigation.navigate('CustomerOutstanding', { customerId: summary.customerId })}
+              >
                 <View style={styles.cardRow}>
                   <View style={styles.cardTitleWrap}>
                     <Text style={styles.cardTitle}>
-                      {row.locationLabel} · {row.customerName}
+                      {summary.branchName} · {summary.customerName}
                     </Text>
-                    <Text style={styles.cardSub}>{row.daysSinceLastCharge ?? 0} days overdue</Text>
+                    <Text style={styles.cardSub}>
+                      {summary.invoiceCount} invoice{summary.invoiceCount === 1 ? '' : 's'} outstanding
+                    </Text>
                   </View>
-                  <PriceChip amount={row.outstandingBalance} />
+                  <PriceChip amount={summary.totalOutstanding} />
                 </View>
-                <Pressable
-                  style={[styles.remindButton, reminding === row.customerId && styles.remindButtonDisabled]}
-                  onPress={() => handleRemind(row.customerId)}
-                  disabled={reminding === row.customerId}
-                >
-                  {reminding === row.customerId ? (
-                    <ActivityIndicator color={colors.navyDeep} />
-                  ) : (
-                    <Text style={styles.remindButtonText}>
-                      {sentFor === row.customerId ? 'Reminder Sent ✓' : 'Send WhatsApp Reminder'}
-                    </Text>
-                  )}
-                </Pressable>
-              </View>
+              </Pressable>
             ))}
           </ScrollView>
         )}
@@ -105,6 +205,29 @@ const createStyles = (colors: ColorTokens) =>
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'flex-start',
+    },
+    segmentRow: {
+      flexDirection: 'row',
+      gap: spacing.xs,
+      marginTop: spacing.sm,
+    },
+    segment: {
+      flex: 1,
+      paddingVertical: spacing.sm,
+      borderRadius: radii.sm,
+      alignItems: 'center',
+      backgroundColor: 'rgba(255,255,255,0.08)',
+    },
+    segmentActive: {
+      backgroundColor: 'rgba(255,255,255,0.22)',
+    },
+    segmentText: {
+      fontSize: typography.secondary,
+      fontWeight: '700',
+      color: '#C8A67B',
+    },
+    segmentTextActive: {
+      color: colors.cream,
     },
     settingsButton: {
       width: 28,

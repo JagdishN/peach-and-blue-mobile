@@ -6,6 +6,8 @@ import { SettingsScreen } from '../screens/shared/SettingsScreen';
 import { SetupScreen } from '../screens/admin/SetupScreen';
 import { BranchesScreen } from '../screens/admin/BranchesScreen';
 import { StaffManagementScreen } from '../screens/admin/StaffManagementScreen';
+import { CustomerOutstandingScreen } from '../screens/admin/CustomerOutstandingScreen';
+import { VendorInvoiceRegisterScreen } from '../screens/admin/VendorInvoiceRegisterScreen';
 
 export type AdminStackParamList = {
   AdminTabs: undefined;
@@ -16,6 +18,12 @@ export type AdminStackParamList = {
   Setup: undefined;
   Branches: undefined;
   Staff: undefined;
+  // Outstanding-dues rework — reached from the Ledger tab's "Outstanding
+  // Payments" segment, not a new bottom-nav item.
+  CustomerOutstanding: { customerId: string };
+  // Third-party vendor invoice management — reached via Setup, not a new
+  // bottom-nav item (spec section 8).
+  VendorInvoices: undefined;
 };
 
 const Stack = createNativeStackNavigator<AdminStackParamList>();
@@ -28,5 +36,7 @@ export const AdminStack: React.FC = () => (
     <Stack.Screen name="Setup" component={SetupScreen} />
     <Stack.Screen name="Branches" component={BranchesScreen} />
     <Stack.Screen name="Staff" component={StaffManagementScreen} />
+    <Stack.Screen name="CustomerOutstanding" component={CustomerOutstandingScreen} />
+    <Stack.Screen name="VendorInvoices" component={VendorInvoiceRegisterScreen} />
   </Stack.Navigator>
 );

@@ -35,10 +35,17 @@ export const setOnAuthExpired = (callback: (() => void) | null): void => {
 
 export class ApiError extends Error {
   status: number;
+  // Outstanding-dues rework — a machine-readable discriminator for a few
+  // specific backend errors (DUPLICATE_REMINDER, PENDING_VERIFICATION)
+  // that need different UI handling (e.g. an "override and send anyway"
+  // button) than a generic error message would support. undefined for
+  // every other error, same as always.
+  code?: string;
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, code?: string) {
     super(message);
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -131,8 +138,8 @@ export const apiRequest = async <T>(path: string, options: RequestOptions = {}, 
   const data = await response.json().catch(() => undefined);
 
   if (!response.ok) {
-    const message = (data as { error?: string } | undefined)?.error ?? 'Request failed';
-    throw new ApiError(response.status, message);
+    const body = data as { error?: string; code?: string } | undefined;
+    throw new ApiError(response.status, body?.error ?? 'Request failed', body?.code);
   }
 
   return data as T;

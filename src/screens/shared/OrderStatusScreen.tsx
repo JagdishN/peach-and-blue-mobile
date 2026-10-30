@@ -10,10 +10,14 @@ import {
   recordOrderPayment,
   reviseOrderAmount,
   assignOrderStaff,
+  fetchInvoicePaymentSummary,
+  generateIdempotencyKey,
+  reportBankUpiPayment,
   Order,
   OrderItem,
   InternalStatus,
   PaymentMethod,
+  InvoicePaymentSummary,
 } from '../../api/orders';
 import { fetchUsers, StaffUser } from '../../api/users';
 import { getDisplayName } from '../../utils/displayName';
@@ -98,6 +102,27 @@ export const OrderStatusScreen: React.FC = () => {
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod | null>(null);
   const [recordingPayment, setRecordingPayment] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [paymentNotice, setPaymentNotice] = useState<string | null>(null);
+
+  // Payment-safety review section 6/12: an optional staff-entered partial
+  // amount (blank = pay the full outstanding balance, preserving the old
+  // one-tap UX), the invoice's live outstanding-balance summary, and a
+  // per-attempt idempotency key — regenerated after every submission
+  // (success or failure) so a genuinely NEW tap never accidentally reuses a
+  // key from a request that already went through.
+  const [partialAmount, setPartialAmount] = useState('');
+  const [paymentSummary, setPaymentSummary] = useState<InvoicePaymentSummary | null>(null);
+  const [idempotencyKey, setIdempotencyKey] = useState(() => generateIdempotencyKey());
+
+  // Payment-safety review section 7 (Static Bank UPI Workflow, Stage A) —
+  // a separate report, not routed through recordOrderPayment, since this
+  // doesn't mark the order paid immediately (stays pending until an admin
+  // verifies it against the real bank account).
+  const [bankUpiAmount, setBankUpiAmount] = useState('');
+  const [bankUpiUtr, setBankUpiUtr] = useState('');
+  const [reportingBankUpi, setReportingBankUpi] = useState(false);
+  const [bankUpiError, setBankUpiError] = useState<string | null>(null);
+  const [bankUpiNotice, setBankUpiNotice] = useState<string | null>(null);
 
   const loadOrder = useCallback(async () => {
     setLoading(true);
@@ -112,9 +137,22 @@ export const OrderStatusScreen: React.FC = () => {
     }
   }, [route.params.orderId]);
 
+  const loadPaymentSummary = useCallback(async () => {
+    try {
+      const summary = await fetchInvoicePaymentSummary(route.params.orderId);
+      setPaymentSummary(summary);
+    } catch {
+      // No invoice yet, or summary genuinely unavailable — the card below
+      // just falls back to showing nothing rather than an error; payment
+      // recording itself doesn't depend on this having loaded.
+      setPaymentSummary(null);
+    }
+  }, [route.params.orderId]);
+
   useEffect(() => {
     loadOrder();
-  }, [loadOrder]);
+    loadPaymentSummary();
+  }, [loadOrder, loadPaymentSummary]);
 
   useEffect(() => {
     if (user?.role === 'admin' && order?.customer.branchId) {
@@ -138,16 +176,17 @@ export const OrderStatusScreen: React.FC = () => {
     }
   };
 
-  // A daily-billing order not yet marked paid can have payment recorded at
-  // any time — before, during, or after delivery (CLAUDE.md "Payment
-  // marking", changed 2026-10-30 per client request: delivery and payment
-  // used to be forced into the same moment, since the customer may not pay
-  // immediately at delivery). Reads order.billingMode (this order's own
-  // snapshot from creation time), NOT order.customer.billingMode — CLAUDE.md
-  // "Monthly billing retroactivity — RESOLVED": the customer's current
-  // setting can have changed since this order was created, and must not
-  // retroactively change how this specific order is settled.
-  const canRecordPayment = order?.billingMode !== 'monthly_billing' && order?.paymentStatus !== 'paid';
+  // A daily-billing order can have payment recorded once it's Delivered,
+  // not before (client request, 2026-10-30) — payment and delivery are
+  // still separate actions (the customer may not pay at the exact moment
+  // of delivery), but the Record Payment card itself only appears once
+  // internalStatus reaches 'delivered'. Reads order.billingMode (this
+  // order's own snapshot from creation time), NOT order.customer.billingMode
+  // — CLAUDE.md "Monthly billing retroactivity — RESOLVED": the customer's
+  // current setting can have changed since this order was created, and
+  // must not retroactively change how this specific order is settled.
+  const canRecordPayment =
+    order?.internalStatus === 'delivered' && order?.billingMode !== 'monthly_billing' && order?.paymentStatus !== 'paid';
 
   const handleAdvanceStatus = async () => {
     if (!order) return;
@@ -170,16 +209,61 @@ export const OrderStatusScreen: React.FC = () => {
   const handleRecordPayment = async () => {
     if (!order || !selectedPaymentMethod) return;
 
+    const amount = partialAmount.trim() ? Number(partialAmount) : undefined;
+    if (amount !== undefined && (!Number.isFinite(amount) || amount <= 0)) {
+      setPaymentError('Enter a valid amount, or leave it blank to record the full outstanding balance.');
+      return;
+    }
+
     setRecordingPayment(true);
     setPaymentError(null);
+    setPaymentNotice(null);
     try {
-      const updated = await recordOrderPayment(order.id, selectedPaymentMethod);
-      setOrder(updated);
+      const result = await recordOrderPayment(order.id, selectedPaymentMethod, { amount, idempotencyKey });
+      setOrder(result.order);
+      setPaymentSummary(result.paymentSummary);
       setSelectedPaymentMethod(null);
+      setPartialAmount('');
+      if (result.overpayment) {
+        setPaymentNotice(
+          'This payment was more than the outstanding balance — the excess has been logged for admin review, not lost.'
+        );
+      }
     } catch (err) {
       setPaymentError(err instanceof ApiError ? err.message : 'Could not record payment.');
     } finally {
       setRecordingPayment(false);
+      // Always issue a fresh key after a submission completes (success or
+      // failure) — a genuinely new tap must never accidentally reuse a key
+      // from a request that already went through.
+      setIdempotencyKey(generateIdempotencyKey());
+    }
+  };
+
+  const handleReportBankUpi = async () => {
+    if (!order) return;
+    const amount = Number(bankUpiAmount);
+    if (!bankUpiAmount.trim() || !Number.isFinite(amount) || amount <= 0) {
+      setBankUpiError('Enter a valid amount.');
+      return;
+    }
+    if (!bankUpiUtr.trim()) {
+      setBankUpiError('Enter the UTR/reference number from the transfer.');
+      return;
+    }
+
+    setReportingBankUpi(true);
+    setBankUpiError(null);
+    setBankUpiNotice(null);
+    try {
+      await reportBankUpiPayment(order.id, amount, bankUpiUtr.trim());
+      setBankUpiAmount('');
+      setBankUpiUtr('');
+      setBankUpiNotice('Reported — this will show as paid once an admin verifies it against the bank account.');
+    } catch (err) {
+      setBankUpiError(err instanceof ApiError ? err.message : 'Could not report this payment.');
+    } finally {
+      setReportingBankUpi(false);
     }
   };
 
@@ -274,6 +358,22 @@ export const OrderStatusScreen: React.FC = () => {
           <View style={styles.revisionCard}>
             <Text style={styles.sectionTitle}>Record Payment</Text>
 
+            {/* Payment-safety review section 12, "Invoice Payment
+                Summary" — shows what's actually been collected and
+                allocated so far, not just a flat paid/unpaid flag. */}
+            {paymentSummary && (
+              <View style={styles.summaryBox}>
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Collected so far</Text>
+                  <Text style={styles.summaryValue}>₹{paymentSummary.collected}</Text>
+                </View>
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Outstanding</Text>
+                  <Text style={[styles.summaryValue, styles.summaryOutstanding]}>₹{paymentSummary.outstanding}</Text>
+                </View>
+              </View>
+            )}
+
             <Text style={styles.fieldLabel}>Payment Method</Text>
             <View style={styles.toggleRow}>
               {PAYMENT_METHOD_OPTIONS.map((option) => (
@@ -291,7 +391,18 @@ export const OrderStatusScreen: React.FC = () => {
               ))}
             </View>
 
+            <Text style={styles.fieldLabel}>Amount (leave blank for the full outstanding balance)</Text>
+            <TextInput
+              style={styles.field}
+              value={partialAmount}
+              onChangeText={setPartialAmount}
+              keyboardType="decimal-pad"
+              placeholder={paymentSummary ? `₹${paymentSummary.outstanding}` : undefined}
+              placeholderTextColor={colors.muted}
+            />
+
             {paymentError && <Text style={styles.error}>{paymentError}</Text>}
+            {paymentNotice && <Text style={styles.notice}>{paymentNotice}</Text>}
 
             <Pressable
               style={[
@@ -305,6 +416,42 @@ export const OrderStatusScreen: React.FC = () => {
                 <ActivityIndicator color={colors.white} />
               ) : (
                 <Text style={styles.advanceButtonText}>Record Payment</Text>
+              )}
+            </Pressable>
+
+            {/* Payment-safety review section 7, Static Bank UPI Workflow
+                Stage A — a separate, explicitly two-stage flow: this does
+                NOT mark the order paid, it stays pending until an admin
+                verifies it against the real bank account. */}
+            <View style={styles.bankUpiDivider} />
+            <Text style={styles.fieldLabel}>Or report a direct bank UPI transfer (static QR)</Text>
+            <TextInput
+              style={styles.field}
+              value={bankUpiAmount}
+              onChangeText={setBankUpiAmount}
+              keyboardType="decimal-pad"
+              placeholder="Amount received"
+              placeholderTextColor={colors.muted}
+            />
+            <TextInput
+              style={styles.field}
+              value={bankUpiUtr}
+              onChangeText={setBankUpiUtr}
+              placeholder="UTR / reference number"
+              placeholderTextColor={colors.muted}
+              autoCapitalize="characters"
+            />
+            {bankUpiError && <Text style={styles.error}>{bankUpiError}</Text>}
+            {bankUpiNotice && <Text style={styles.notice}>{bankUpiNotice}</Text>}
+            <Pressable
+              style={[styles.secondaryButton, reportingBankUpi && styles.advanceButtonDisabled]}
+              onPress={handleReportBankUpi}
+              disabled={reportingBankUpi}
+            >
+              {reportingBankUpi ? (
+                <ActivityIndicator color={colors.navyDeep} />
+              ) : (
+                <Text style={styles.secondaryButtonText}>Report Bank Transfer</Text>
               )}
             </Pressable>
           </View>
@@ -523,5 +670,55 @@ const createStyles = (colors: ColorTokens) =>
     hint: {
       fontSize: typography.secondary,
       color: colors.muted,
+    },
+    notice: {
+      fontSize: typography.secondary,
+      color: colors.navyText,
+      backgroundColor: colors.warningBg,
+      borderRadius: radii.sm,
+      padding: spacing.sm,
+      marginBottom: spacing.sm,
+    },
+    summaryBox: {
+      backgroundColor: colors.surface,
+      borderRadius: radii.md,
+      padding: spacing.sm,
+      marginBottom: spacing.sm,
+    },
+    summaryRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      paddingVertical: 2,
+    },
+    summaryLabel: {
+      fontSize: typography.secondary,
+      color: colors.muted,
+    },
+    summaryValue: {
+      fontSize: typography.secondary,
+      fontWeight: '700',
+      color: colors.navyText,
+    },
+    summaryOutstanding: {
+      color: colors.peachPrimary,
+    },
+    bankUpiDivider: {
+      height: 1,
+      backgroundColor: colors.border,
+      marginTop: spacing.md,
+      marginBottom: spacing.sm,
+    },
+    secondaryButton: {
+      borderWidth: 1.5,
+      borderColor: colors.navyDeep,
+      borderRadius: radii.md,
+      paddingVertical: spacing.md,
+      alignItems: 'center',
+      marginTop: spacing.xs,
+    },
+    secondaryButtonText: {
+      color: colors.navyDeep,
+      fontWeight: '700',
+      fontSize: typography.button,
     },
   });
