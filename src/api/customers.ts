@@ -6,6 +6,12 @@ export interface Customer {
   id: string;
   fullName: string;
   phoneNumber: string;
+  // Both optional — every WhatsApp notification fans out to phoneNumber
+  // plus whichever of these are set (backend: notificationService.ts's
+  // sendNotification). Renamed from whatsappNumber + added
+  // secondaryPhoneNumber (2026-10-30, client request).
+  alternativePhoneNumber: string | null;
+  secondaryPhoneNumber: string | null;
   locationLabel: string;
   branchId: string;
   branch: { branchName: string };
@@ -61,6 +67,9 @@ export const searchCustomers = (phone: string) =>
 export interface CreateCustomerInput {
   fullName: string;
   phoneNumber: string;
+  // Optional, same as on Customer above.
+  alternativePhoneNumber?: string;
+  secondaryPhoneNumber?: string;
   locationLabel: string;
   // Admin-only in practice — a staff caller is locked to their own branch
   // server-side regardless of what's sent here (customerController.ts::
