@@ -121,16 +121,35 @@ export const generateIdempotencyKey = (): string =>
 // the old one-tap UX) and requires an `idempotencyKey` so a double-tap
 // can't create a second real receipt. Response now also carries the
 // updated paymentSummary and an `overpayment` flag.
+// Payment collection / customer advances rework (2026-10-31) — both
+// optional and only meaningful together (cash only). Omitted, the call
+// behaves exactly as before: `amount` is applied as-is and any excess
+// becomes a generic overpayment exception.
+export type ExcessHandling = 'return_change' | 'advance' | 'pending_review';
+
+export interface CashBreakdown {
+  amountTendered: number;
+  amountApplied: number;
+  changeReturned: number;
+  advanceCreated: number;
+}
+
 export const recordOrderPayment = (
   id: string,
   paymentMethod: PaymentMethod,
-  options: { amount?: number; idempotencyKey: string }
+  options: { amount?: number; idempotencyKey: string; amountTendered?: number; excessHandling?: ExcessHandling }
 ) =>
-  apiRequest<{ order: Order; paymentSummary: InvoicePaymentSummary; overpayment: boolean }>(
+  apiRequest<{ order: Order; paymentSummary: InvoicePaymentSummary; overpayment: boolean; cashBreakdown?: CashBreakdown }>(
     `/api/v1/orders/${id}/payment`,
     {
       method: 'PATCH',
-      body: { paymentMethod, amount: options.amount, idempotencyKey: options.idempotencyKey },
+      body: {
+        paymentMethod,
+        amount: options.amount,
+        idempotencyKey: options.idempotencyKey,
+        amountTendered: options.amountTendered,
+        excessHandling: options.excessHandling,
+      },
     }
   );
 

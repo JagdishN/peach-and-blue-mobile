@@ -24,6 +24,13 @@ import {
   Customer,
 } from '../../api/customers';
 import { fetchBranches, Branch } from '../../api/branches';
+import {
+  fetchCustomerCreditBalance,
+  fetchCustomerCreditHistory,
+  refundCustomerCredit,
+  CustomerCreditBalance,
+  CustomerCreditTransaction,
+} from '../../api/customerCredit';
 import { ColorTokens, fonts, radii, spacing, typography, withOpacity } from '../../theme/theme';
 import type { AdminStackParamList } from '../../navigation/AdminStack';
 
@@ -74,6 +81,20 @@ export const CustomerManagementScreen: React.FC = () => {
   const [bagReplacementCount, setBagReplacementCount] = useState<number | null>(null);
   const [bagActionLoading, setBagActionLoading] = useState(false);
   const [bagError, setBagError] = useState<string | null>(null);
+
+  // Payment collection / customer advances rework (2026-10-31), Phase 7 —
+  // "provide visibility into: customer advance balances, advance
+  // transaction history." Admin-only refund action; reversal isn't
+  // exposed here (same "backend live, this specific action's UI not yet
+  // built" precedent as the discount-audit history) — it's a correction
+  // tool for a mistaken entry, not a routine admin-screen action.
+  const [creditBalance, setCreditBalance] = useState<CustomerCreditBalance | null>(null);
+  const [creditHistory, setCreditHistory] = useState<CustomerCreditTransaction[]>([]);
+  const [showCreditHistory, setShowCreditHistory] = useState(false);
+  const [refundAmountInput, setRefundAmountInput] = useState('');
+  const [refundReasonInput, setRefundReasonInput] = useState('');
+  const [creditActionLoading, setCreditActionLoading] = useState(false);
+  const [creditError, setCreditError] = useState<string | null>(null);
 
   // "How do I test it" gap — there was no way to create a customer from the
   // admin side at all; only staff's New Order Entry phone-search/create flow
@@ -226,6 +247,16 @@ export const CustomerManagementScreen: React.FC = () => {
     fetchBagReplacements(customer.id)
       .then((charges) => setBagReplacementCount(charges.length))
       .catch(() => setBagReplacementCount(null));
+
+    setCreditError(null);
+    setCreditBalance(null);
+    setCreditHistory([]);
+    setShowCreditHistory(false);
+    setRefundAmountInput('');
+    setRefundReasonInput('');
+    fetchCustomerCreditBalance(customer.id)
+      .then(setCreditBalance)
+      .catch(() => setCreditBalance(null));
   };
 
   const handleDeleteCustomer = async () => {
@@ -342,6 +373,56 @@ export const CustomerManagementScreen: React.FC = () => {
       setBagError(err instanceof ApiError ? err.message : 'Could not log the replacement charge.');
     } finally {
       setBagActionLoading(false);
+    }
+  };
+
+  const handleToggleCreditHistory = async () => {
+    if (!editing) return;
+    if (showCreditHistory) {
+      setShowCreditHistory(false);
+      return;
+    }
+    setCreditActionLoading(true);
+    setCreditError(null);
+    try {
+      const history = await fetchCustomerCreditHistory(editing.id);
+      setCreditHistory(history);
+      setShowCreditHistory(true);
+    } catch (err) {
+      setCreditError(err instanceof ApiError ? err.message : 'Could not load advance history.');
+    } finally {
+      setCreditActionLoading(false);
+    }
+  };
+
+  const handleRefundCredit = async () => {
+    if (!editing) return;
+    const amount = Number(refundAmountInput);
+    if (!refundAmountInput.trim() || !Number.isFinite(amount) || amount <= 0) {
+      setCreditError('Enter a valid refund amount.');
+      return;
+    }
+    if (!refundReasonInput.trim()) {
+      setCreditError('A reason is required to refund customer advance.');
+      return;
+    }
+
+    setCreditActionLoading(true);
+    setCreditError(null);
+    try {
+      await refundCustomerCredit(editing.id, amount, refundReasonInput.trim());
+      const [balance, history] = await Promise.all([
+        fetchCustomerCreditBalance(editing.id),
+        showCreditHistory ? fetchCustomerCreditHistory(editing.id) : Promise.resolve(creditHistory),
+      ]);
+      setCreditBalance(balance);
+      setCreditHistory(history);
+      setRefundAmountInput('');
+      setRefundReasonInput('');
+    } catch (err) {
+      setCreditError(err instanceof ApiError ? err.message : 'Could not record this refund.');
+    } finally {
+      setCreditActionLoading(false);
     }
   };
 
@@ -639,6 +720,77 @@ export const CustomerManagementScreen: React.FC = () => {
             )}
             {bagError && <Text style={styles.error}>{bagError}</Text>}
 
+            {/* Payment collection / customer advances rework, Phase 7 —
+                "make balances visible to Admin and authorized Staff."
+                Refund is the only write action here (Admin-only, already
+                true for this whole screen); reversal of a mistaken entry
+                is a backend-only capability for now, same as the discount-
+                audit history elsewhere in this app. */}
+            <View style={styles.secondaryDivider} />
+            <Text style={styles.secondaryLabel}>Customer Advance</Text>
+            <Text style={styles.bagStatus}>
+              Available: ₹{creditBalance ? Math.round(creditBalance.availablePaise) / 100 : 0}
+            </Text>
+            <Pressable style={styles.bagActionButton} onPress={handleToggleCreditHistory} disabled={creditActionLoading}>
+              {creditActionLoading && !showCreditHistory ? (
+                <ActivityIndicator color={colors.navyDeep} />
+              ) : (
+                <Text style={styles.bagActionButtonText}>{showCreditHistory ? 'Hide History' : 'View History'}</Text>
+              )}
+            </Pressable>
+            {showCreditHistory && (
+              <View style={styles.creditHistoryBox}>
+                {creditHistory.length === 0 ? (
+                  <Text style={styles.creditHistoryEmpty}>No advance transactions on record.</Text>
+                ) : (
+                  creditHistory.map((tx) => (
+                    <View key={tx.id} style={styles.creditHistoryRow}>
+                      <Text style={styles.creditHistoryType}>
+                        {tx.transactionType === 'issued' && 'Issued'}
+                        {tx.transactionType === 'applied' && `Applied${tx.appliedToInvoice ? ` to ${tx.appliedToInvoice.invoiceNumber}` : ''}`}
+                        {tx.transactionType === 'refunded' && 'Refunded'}
+                        {tx.transactionType === 'reversed' && 'Reversed'}
+                        {' · ₹'}
+                        {Math.round(tx.amountPaise) / 100}
+                      </Text>
+                      <Text style={styles.creditHistoryMeta}>
+                        {new Date(tx.createdAt).toLocaleDateString()}
+                        {tx.createdBy ? ` · ${tx.createdBy.fullName}` : ' · System'}
+                      </Text>
+                    </View>
+                  ))
+                )}
+              </View>
+            )}
+            <Text style={[styles.secondaryLabel, { marginTop: spacing.sm }]}>Refund Advance</Text>
+            <TextInput
+              style={styles.field}
+              value={refundAmountInput}
+              onChangeText={setRefundAmountInput}
+              keyboardType="decimal-pad"
+              placeholder="Amount to refund"
+              placeholderTextColor={colors.muted}
+            />
+            <TextInput
+              style={styles.field}
+              value={refundReasonInput}
+              onChangeText={setRefundReasonInput}
+              placeholder="Reason (required)"
+              placeholderTextColor={colors.muted}
+            />
+            <Pressable
+              style={[styles.bagActionButton, creditActionLoading && styles.saveButtonDisabled]}
+              onPress={handleRefundCredit}
+              disabled={creditActionLoading}
+            >
+              {creditActionLoading ? (
+                <ActivityIndicator color={colors.danger} />
+              ) : (
+                <Text style={styles.bagActionButtonText}>Refund Advance</Text>
+              )}
+            </Pressable>
+            {creditError && <Text style={styles.error}>{creditError}</Text>}
+
             {/* Visually secondary to Billing Mode above — per CLAUDE.md,
                 client framed this as "an occasional, as-needed admin action,
                 not a headline feature", not something to give equal
@@ -880,6 +1032,31 @@ const createStyles = (colors: ColorTokens) =>
       color: colors.navyText,
       fontWeight: '700',
       fontSize: typography.button,
+    },
+    creditHistoryBox: {
+      backgroundColor: colors.surface,
+      borderRadius: radii.md,
+      padding: spacing.sm,
+      marginBottom: spacing.sm,
+    },
+    creditHistoryEmpty: {
+      fontSize: typography.secondary,
+      color: colors.muted,
+    },
+    creditHistoryRow: {
+      paddingVertical: spacing.xs,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    creditHistoryType: {
+      fontSize: typography.secondary,
+      fontWeight: '700',
+      color: colors.navyText,
+    },
+    creditHistoryMeta: {
+      fontSize: typography.caption,
+      color: colors.muted,
+      marginTop: 1,
     },
     toggle: {
       flex: 1,

@@ -17,7 +17,12 @@ type Nav = NativeStackNavigationProp<AdminStackParamList>;
 // Billing (the existing, separate running-balance model) and Outstanding
 // Payments (the new per-invoice model) live as two segments of this SAME
 // Ledger tab, not two new bottom-nav items.
-type LedgerSegment = 'monthly_billing' | 'outstanding_payments';
+// Payment Reconciliation investigation views (2026-10-31) — a third segment
+// alongside the existing two, same "adapt the existing navigation, don't
+// add a new bottom-nav item" principle. This segment is just an entry
+// point into a dedicated screen (PaymentReconciliationScreen), same pattern
+// "Outstanding Payments" already uses for CustomerOutstandingScreen.
+type LedgerSegment = 'monthly_billing' | 'outstanding_payments' | 'reconciliation';
 
 interface CustomerOutstandingSummary {
   customerId: string;
@@ -123,11 +128,33 @@ export const LedgerAgingScreen: React.FC = () => {
               Outstanding Payments
             </Text>
           </Pressable>
+          <Pressable
+            style={[styles.segment, segment === 'reconciliation' && styles.segmentActive]}
+            onPress={() => setSegment('reconciliation')}
+          >
+            <Text style={[styles.segmentText, segment === 'reconciliation' && styles.segmentTextActive]}>
+              Reconciliation
+            </Text>
+          </Pressable>
         </View>
       </View>
 
       <View style={styles.body}>
-        {segment === 'monthly_billing' ? (
+        {segment === 'reconciliation' ? (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Payment Exceptions &amp; Unmatched Payments</Text>
+            <Text style={styles.cardSub}>
+              Investigate overpayments, uncertain link cancellations, and provider payments that could not be matched
+              to an invoice. Read-only — nothing here moves money.
+            </Text>
+            <Pressable
+              style={styles.remindButton}
+              onPress={() => navigation.navigate('PaymentReconciliation')}
+            >
+              <Text style={styles.remindButtonText}>Open Reconciliation Center</Text>
+            </Pressable>
+          </View>
+        ) : segment === 'monthly_billing' ? (
           loading ? (
             <ActivityIndicator color={colors.peachPrimary} style={{ marginTop: spacing.xl }} />
           ) : rows.length === 0 ? (

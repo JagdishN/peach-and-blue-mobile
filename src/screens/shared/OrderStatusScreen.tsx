@@ -18,6 +18,8 @@ import {
   InternalStatus,
   PaymentMethod,
   InvoicePaymentSummary,
+  ExcessHandling,
+  CashBreakdown,
 } from '../../api/orders';
 import { fetchUsers, StaffUser } from '../../api/users';
 import { getDisplayName } from '../../utils/displayName';
@@ -114,6 +116,14 @@ export const OrderStatusScreen: React.FC = () => {
   const [paymentSummary, setPaymentSummary] = useState<InvoicePaymentSummary | null>(null);
   const [idempotencyKey, setIdempotencyKey] = useState(() => generateIdempotencyKey());
 
+  // Payment collection / customer advances rework (2026-10-31), Phase 2/3/7
+  // — cash only. `partialAmount` above still doubles as "amount tendered"
+  // for cash (the field's label just changes); this only adds the explicit
+  // 3-way choice, shown ONLY once a cash amount tendered actually exceeds
+  // the live outstanding balance.
+  const [excessHandling, setExcessHandling] = useState<ExcessHandling | null>(null);
+  const [cashBreakdown, setCashBreakdown] = useState<CashBreakdown | null>(null);
+
   // Payment-safety review section 7 (Static Bank UPI Workflow, Stage A) —
   // a separate report, not routed through recordOrderPayment, since this
   // doesn't mark the order paid immediately (stays pending until an admin
@@ -206,6 +216,16 @@ export const OrderStatusScreen: React.FC = () => {
     }
   };
 
+  // Payment collection / customer advances rework — cash only. Positive
+  // only when there's a real amount tendered beyond the live outstanding
+  // balance; drives whether the 3-way excess-handling choice shows at all.
+  const excessPreview = useMemo(() => {
+    if (selectedPaymentMethod !== 'cash' || !paymentSummary) return 0;
+    const tendered = Number(partialAmount);
+    if (!partialAmount.trim() || !Number.isFinite(tendered)) return 0;
+    return Math.max(0, Math.round((tendered - paymentSummary.outstanding) * 100) / 100);
+  }, [selectedPaymentMethod, partialAmount, paymentSummary]);
+
   const handleRecordPayment = async () => {
     if (!order || !selectedPaymentMethod) return;
 
@@ -214,17 +234,32 @@ export const OrderStatusScreen: React.FC = () => {
       setPaymentError('Enter a valid amount, or leave it blank to record the full outstanding balance.');
       return;
     }
+    if (excessPreview > 0 && !excessHandling) {
+      setPaymentError('This amount is more than what\'s owed — choose how to handle the extra before saving.');
+      return;
+    }
 
     setRecordingPayment(true);
     setPaymentError(null);
     setPaymentNotice(null);
+    setCashBreakdown(null);
     try {
-      const result = await recordOrderPayment(order.id, selectedPaymentMethod, { amount, idempotencyKey });
+      const result =
+        excessPreview > 0 && excessHandling
+          ? await recordOrderPayment(order.id, selectedPaymentMethod, {
+              amountTendered: amount,
+              excessHandling,
+              idempotencyKey,
+            })
+          : await recordOrderPayment(order.id, selectedPaymentMethod, { amount, idempotencyKey });
       setOrder(result.order);
       setPaymentSummary(result.paymentSummary);
       setSelectedPaymentMethod(null);
       setPartialAmount('');
-      if (result.overpayment) {
+      setExcessHandling(null);
+      if (result.cashBreakdown) {
+        setCashBreakdown(result.cashBreakdown);
+      } else if (result.overpayment) {
         setPaymentNotice(
           'This payment was more than the outstanding balance — the excess has been logged for admin review, not lost.'
         );
@@ -391,26 +426,78 @@ export const OrderStatusScreen: React.FC = () => {
               ))}
             </View>
 
-            <Text style={styles.fieldLabel}>Amount (leave blank for the full outstanding balance)</Text>
+            <Text style={styles.fieldLabel}>
+              {selectedPaymentMethod === 'cash'
+                ? 'Amount Tendered (leave blank for the full outstanding balance)'
+                : 'Amount (leave blank for the full outstanding balance)'}
+            </Text>
             <TextInput
               style={styles.field}
               value={partialAmount}
-              onChangeText={setPartialAmount}
+              onChangeText={(text) => {
+                setPartialAmount(text);
+                setExcessHandling(null);
+              }}
               keyboardType="decimal-pad"
               placeholder={paymentSummary ? `₹${paymentSummary.outstanding}` : undefined}
               placeholderTextColor={colors.muted}
             />
 
+            {/* Payment collection / customer advances rework — only shown
+                for cash, and only once the tendered amount actually
+                exceeds what's owed. Three explicit choices, per Phase 3:
+                staff must pick one, nothing is assumed. */}
+            {excessPreview > 0 && (
+              <View style={styles.excessBox}>
+                <Text style={styles.excessLabel}>₹{excessPreview} more than owed — how should this be handled?</Text>
+                {(
+                  [
+                    { value: 'return_change' as const, label: `Return ₹${excessPreview} change` },
+                    { value: 'advance' as const, label: 'Keep as customer advance' },
+                    { value: 'pending_review' as const, label: "Not sure — let Admin decide" },
+                  ]
+                ).map((option) => (
+                  <Pressable
+                    key={option.value}
+                    style={[styles.excessOption, excessHandling === option.value && styles.excessOptionActive]}
+                    onPress={() => setExcessHandling(option.value)}
+                  >
+                    <Text style={[styles.excessOptionText, excessHandling === option.value && styles.excessOptionTextActive]}>
+                      {option.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            )}
+
             {paymentError && <Text style={styles.error}>{paymentError}</Text>}
             {paymentNotice && <Text style={styles.notice}>{paymentNotice}</Text>}
+
+            {/* Confirmation of exactly what happened — distinguishes
+                tendered, applied, change returned, and advance created as
+                four separate figures, per Phase 8's "these must never be
+                treated as interchangeable." */}
+            {cashBreakdown && (
+              <View style={styles.cashBreakdownBox}>
+                <Text style={styles.cashBreakdownRow}>Amount Tendered: ₹{cashBreakdown.amountTendered}</Text>
+                <Text style={styles.cashBreakdownRow}>Applied to Invoice: ₹{cashBreakdown.amountApplied}</Text>
+                {cashBreakdown.changeReturned > 0 && (
+                  <Text style={styles.cashBreakdownRow}>Change Returned: ₹{cashBreakdown.changeReturned}</Text>
+                )}
+                {cashBreakdown.advanceCreated > 0 && (
+                  <Text style={styles.cashBreakdownRow}>Customer Advance Created: ₹{cashBreakdown.advanceCreated}</Text>
+                )}
+              </View>
+            )}
 
             <Pressable
               style={[
                 styles.advanceButton,
-                (recordingPayment || !selectedPaymentMethod) && styles.advanceButtonDisabled,
+                (recordingPayment || !selectedPaymentMethod || (excessPreview > 0 && !excessHandling)) &&
+                  styles.advanceButtonDisabled,
               ]}
               onPress={handleRecordPayment}
-              disabled={recordingPayment || !selectedPaymentMethod}
+              disabled={recordingPayment || !selectedPaymentMethod || (excessPreview > 0 && !excessHandling)}
             >
               {recordingPayment ? (
                 <ActivityIndicator color={colors.white} />
@@ -701,6 +788,50 @@ const createStyles = (colors: ColorTokens) =>
     },
     summaryOutstanding: {
       color: colors.peachPrimary,
+    },
+    excessBox: {
+      backgroundColor: colors.warningBg,
+      borderRadius: radii.md,
+      padding: spacing.sm,
+      marginBottom: spacing.sm,
+    },
+    excessLabel: {
+      fontSize: typography.secondary,
+      fontWeight: '700',
+      color: colors.navyText,
+      marginBottom: spacing.xs,
+    },
+    excessOption: {
+      borderWidth: 1.5,
+      borderColor: colors.navyDeep,
+      borderRadius: radii.sm,
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.md,
+      marginTop: spacing.xs,
+      alignItems: 'center',
+    },
+    excessOptionActive: {
+      backgroundColor: colors.chrome,
+      borderColor: colors.chrome,
+    },
+    excessOptionText: {
+      fontSize: typography.secondary,
+      fontWeight: '700',
+      color: colors.navyDeep,
+    },
+    excessOptionTextActive: {
+      color: colors.cream,
+    },
+    cashBreakdownBox: {
+      backgroundColor: colors.successBg,
+      borderRadius: radii.md,
+      padding: spacing.sm,
+      marginBottom: spacing.sm,
+    },
+    cashBreakdownRow: {
+      fontSize: typography.secondary,
+      color: colors.navyText,
+      paddingVertical: 1,
     },
     bankUpiDivider: {
       height: 1,

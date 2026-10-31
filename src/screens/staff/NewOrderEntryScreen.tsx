@@ -12,6 +12,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { fetchGarments, Garment } from '../../api/garments';
 import { createOrder } from '../../api/orders';
 import { searchCustomers, createCustomer, markBagIssued, CustomerLookup } from '../../api/customers';
+import { fetchCustomerCreditBalance } from '../../api/customerCredit';
 import { ApiError } from '../../api/client';
 import { ColorTokens, fonts, radii, spacing, typography } from '../../theme/theme';
 import { getServiceTag, SPECIAL_CARE_TAG } from '../../theme/serviceTag';
@@ -78,6 +79,11 @@ export const NewOrderEntryScreen: React.FC = () => {
   // surfaced here since staff is physically at the pickup handing it over.
   const [confirmedCustomerId, setConfirmedCustomerId] = useState<string | null>(null);
   const [bagIssued, setBagIssued] = useState(false);
+  // Payment collection / customer advances rework, Phase 4/7 — "make
+  // balances visible to Admin and authorized Staff." Read-only here;
+  // staff has no refund/reversal action, only CustomerManagementScreen
+  // (admin) does.
+  const [creditAvailable, setCreditAvailable] = useState<number | null>(null);
   const [issuingBag, setIssuingBag] = useState(false);
 
   useEffect(() => {
@@ -341,6 +347,10 @@ export const NewOrderEntryScreen: React.FC = () => {
     setConfirmedCustomerId(customer.id);
     setBagIssued(customer.bagIssued);
     setCustomerConfirmed(true);
+    setCreditAvailable(null);
+    fetchCustomerCreditBalance(customer.id)
+      .then((balance) => setCreditAvailable(Math.round(balance.availablePaise) / 100))
+      .catch(() => setCreditAvailable(null));
   };
 
   const handleConfirmNewCustomer = async () => {
@@ -601,6 +611,9 @@ export const NewOrderEntryScreen: React.FC = () => {
                 <Text style={styles.resultLocation}>
                   {customerPhoneNumber} · {locationLabel}
                 </Text>
+                {creditAvailable !== null && creditAvailable > 0 && (
+                  <Text style={styles.creditAvailableText}>₹{creditAvailable} advance available</Text>
+                )}
               </View>
               <Pressable onPress={resetCustomer}>
                 <Text style={styles.changeCustomerLink}>Change</Text>
@@ -800,6 +813,12 @@ const createStyles = (colors: ColorTokens) =>
     resultLocation: {
       fontSize: typography.secondary,
       color: colors.muted,
+      marginTop: 2,
+    },
+    creditAvailableText: {
+      fontSize: typography.secondary,
+      fontWeight: '700',
+      color: colors.success,
       marginTop: 2,
     },
     newCustomerBlock: {

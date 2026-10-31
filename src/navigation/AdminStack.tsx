@@ -8,6 +8,7 @@ import { BranchesScreen } from '../screens/admin/BranchesScreen';
 import { StaffManagementScreen } from '../screens/admin/StaffManagementScreen';
 import { CustomerOutstandingScreen } from '../screens/admin/CustomerOutstandingScreen';
 import { VendorInvoiceRegisterScreen } from '../screens/admin/VendorInvoiceRegisterScreen';
+import { PaymentReconciliationScreen } from '../screens/admin/PaymentReconciliationScreen';
 
 export type AdminStackParamList = {
   AdminTabs: undefined;
@@ -24,6 +25,9 @@ export type AdminStackParamList = {
   // Third-party vendor invoice management — reached via Setup, not a new
   // bottom-nav item (spec section 8).
   VendorInvoices: undefined;
+  // Payment Reconciliation investigation views — reached via the Ledger
+  // tab's "Reconciliation" segment, not a new bottom-nav item.
+  PaymentReconciliation: undefined;
 };
 
 const Stack = createNativeStackNavigator<AdminStackParamList>();
@@ -38,5 +42,6 @@ export const AdminStack: React.FC = () => (
     <Stack.Screen name="Staff" component={StaffManagementScreen} />
     <Stack.Screen name="CustomerOutstanding" component={CustomerOutstandingScreen} />
     <Stack.Screen name="VendorInvoices" component={VendorInvoiceRegisterScreen} />
+    <Stack.Screen name="PaymentReconciliation" component={PaymentReconciliationScreen} />
   </Stack.Navigator>
 );
