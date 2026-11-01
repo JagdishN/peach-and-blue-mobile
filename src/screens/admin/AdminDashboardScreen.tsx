@@ -2,9 +2,8 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AppScreen } from '../../components/AppScreen';
-import { AccountMenuButton, AccountMenuModal, useAccountMenu } from '../../components/AccountMenu';
+import { ScreenHeader } from '../../components/ScreenHeader';
 import { PriceChip } from '../../components/PriceChip';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -28,7 +27,6 @@ export const AdminDashboardScreen: React.FC = () => {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const user = state.status === 'signedIn' ? state.user : null;
-  const menu = useAccountMenu();
 
   const [branch, setBranch] = useState<Branch | null>(null);
   const [summary, setSummary] = useState<ReportSummary | null>(null);
@@ -66,38 +64,24 @@ export const AdminDashboardScreen: React.FC = () => {
 
   return (
     <AppScreen scroll={false} avatarInHeader>
-      <View style={styles.appbar}>
-        <View style={styles.appbarTopRow}>
-          <View style={styles.titleWrap}>
-            <Text style={styles.title}>Overview</Text>
-            <Text style={styles.subtitle}>Today, {todayLabel()}</Text>
-          </View>
-          <View style={styles.headerIcons}>
-            <Pressable
-              testID="setup-button"
-              accessibilityRole="button"
-              accessibilityLabel="Setup"
-              style={styles.setupButton}
-              onPress={() => navigation.navigate('Setup')}
-              hitSlop={8}
-            >
-              <MaterialCommunityIcons name="cog-outline" size={22} color="#fff" />
-            </Pressable>
-            <AccountMenuButton menu={menu} />
-          </View>
-        </View>
+      <ScreenHeader title="Overview" subtitle={`Today, ${todayLabel()}`}>
         <View style={styles.branchChip}>
           <Text style={styles.branchChipText}>{user?.branchId ? branch?.branchName ?? '…' : 'All Branches ▾'}</Text>
         </View>
-      </View>
-
-      <AccountMenuModal menu={menu} />
+      </ScreenHeader>
 
       <View style={styles.body}>
         {loading || !summary ? (
           <ActivityIndicator color={colors.peachPrimary} style={{ marginTop: spacing.xl }} />
         ) : (
           <>
+            {/* Priority 3 item 3 (2026-11-01, client request) — Admin
+                previously had no order-creation entry point anywhere in the
+                app, only Staff did. */}
+            <Pressable style={styles.newOrderButton} onPress={() => navigation.navigate('NewOrderEntry')}>
+              <Text style={styles.newOrderButtonText}>+ New Order</Text>
+            </Pressable>
+
             <View style={styles.statGrid}>
               <StatCard num={summary.ordersToday} label="Orders Today" styles={styles} />
               <StatCard num={`₹${summary.revenueToday}`} label="Revenue Today" styles={styles} />
@@ -155,49 +139,6 @@ const StatCard: React.FC<{ num: number | string; label: string; styles: ReturnTy
 
 const createStyles = (colors: ColorTokens) =>
   StyleSheet.create({
-    appbar: {
-      backgroundColor: colors.chrome,
-      padding: spacing.lg,
-      paddingBottom: 14,
-    },
-    appbarTopRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-    },
-    // Review finding (typography pass follow-up): at 24sp, plus Android's
-    // accessibility font-scaling multiplying that further, "Overview" +
-    // today's date could get wide enough to collide with the Setup/Avatar
-    // icons on the right, which have no flex of their own. flex:1 here
-    // means this block shrinks/wraps first instead of pushing them off.
-    titleWrap: {
-      flex: 1,
-      marginRight: spacing.sm,
-    },
-    headerIcons: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.sm,
-    },
-    setupButton: {
-      width: 44,
-      height: 44,
-      borderRadius: 22,
-      backgroundColor: 'rgba(16, 24, 40, 0.18)',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    title: {
-      fontFamily: fonts.headingSemiBold,
-      fontWeight: '600',
-      fontSize: typography.screenHeading,
-      color: colors.cream,
-    },
-    subtitle: {
-      fontSize: typography.formLabel,
-      color: '#C8A67B',
-      marginTop: 2,
-    },
     branchChip: {
       alignSelf: 'flex-start',
       backgroundColor: 'rgba(255,255,255,0.12)',
@@ -216,6 +157,18 @@ const createStyles = (colors: ColorTokens) =>
     body: {
       flex: 1,
       padding: 14,
+    },
+    newOrderButton: {
+      backgroundColor: colors.peachPrimary,
+      borderRadius: radii.md,
+      paddingVertical: spacing.md,
+      alignItems: 'center',
+      marginBottom: spacing.md,
+    },
+    newOrderButtonText: {
+      color: colors.white,
+      fontWeight: '700',
+      fontSize: typography.button,
     },
     statGrid: {
       flexDirection: 'row',

@@ -1,9 +1,10 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AppScreen } from '../../components/AppScreen';
+import { ScreenHeader } from '../../components/ScreenHeader';
 import { NivenxaFooter } from '../../components/BrandComponents';
 import { Tag } from '../../components/Tag';
 import { useTheme } from '../../context/ThemeContext';
@@ -40,6 +41,9 @@ export const BranchesScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  // See CustomerManagementScreen.tsx's identical comment — Modal is
+  // outside AppScreen's SafeAreaView, so this clears the Android nav bar.
+  const insets = useSafeAreaInsets();
   // apartment's pastel pairing is fixed regardless of theme (small
   // self-contained badge, same treatment as theme/serviceTag.ts) — area's
   // successBg/success pairing flips together, consistently, like elsewhere.
@@ -116,18 +120,12 @@ export const BranchesScreen: React.FC = () => {
   };
 
   return (
-    <AppScreen scroll={false}>
-      <View style={styles.appbar}>
-        {/* Now reached via Setup (pushed from the stack), not a tab root —
-            needs its own back affordance, same convention as SettingsScreen. */}
-        <View style={styles.appbarTopRow}>
-          <Pressable style={styles.backButton} onPress={() => navigation.goBack()} hitSlop={8}>
-            <MaterialCommunityIcons name="chevron-left" size={22} color={colors.cream} />
-          </Pressable>
-          <Text style={styles.title}>Branches</Text>
-        </View>
-        <Text style={styles.subtitle}>{branches.length} active · Apartment or Area</Text>
-      </View>
+    <AppScreen scroll={false} avatarInHeader>
+      <ScreenHeader
+        title="Branches"
+        subtitle={`${branches.length} active · Apartment or Area`}
+        onBack={() => navigation.goBack()}
+      />
 
       <View style={styles.body}>
         {loading ? (
@@ -152,7 +150,7 @@ export const BranchesScreen: React.FC = () => {
       </View>
 
       <Modal visible={editing !== null} transparent animationType="slide" onRequestClose={() => setEditing(null)}>
-        <View style={styles.modalOverlay}>
+        <View style={[styles.modalOverlay, { paddingBottom: insets.bottom }]}>
           <View style={styles.modalCard}>
             {/* Review finding (typography pass follow-up): this card's
                 maxHeight was never paired with a scrollable child — fine
@@ -248,40 +246,6 @@ export const BranchesScreen: React.FC = () => {
 
 const createStyles = (colors: ColorTokens) =>
   StyleSheet.create({
-    appbar: {
-      backgroundColor: colors.chrome,
-      padding: spacing.lg,
-      paddingBottom: 14,
-    },
-    appbarTopRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.sm,
-      flexWrap: 'wrap',
-    },
-    backButton: {
-      width: 28,
-      height: 28,
-      borderRadius: radii.pill,
-      backgroundColor: 'rgba(255,255,255,0.12)',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    // flexShrink/flexWrap (here and on appbarTopRow above): defensive
-    // against Android's larger-text accessibility setting — see
-    // StaffManagementScreen.tsx's identical fix for the concrete case.
-    title: {
-      flexShrink: 1,
-      fontFamily: fonts.headingSemiBold,
-      fontWeight: '600',
-      fontSize: typography.screenHeading,
-      color: colors.cream,
-    },
-    subtitle: {
-      fontSize: typography.secondary,
-      color: '#C8A67B',
-      marginTop: 2,
-    },
     body: {
       flex: 1,
       padding: 14,

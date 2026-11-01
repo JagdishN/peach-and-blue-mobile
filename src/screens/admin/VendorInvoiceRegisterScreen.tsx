@@ -1,9 +1,10 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AppScreen } from '../../components/AppScreen';
+import { ScreenHeader } from '../../components/ScreenHeader';
 import { NivenxaFooter } from '../../components/BrandComponents';
 import { PriceChip } from '../../components/PriceChip';
 import { useTheme } from '../../context/ThemeContext';
@@ -57,6 +58,9 @@ export const VendorInvoiceRegisterScreen: React.FC = () => {
   const user = authState.status === 'signedIn' ? authState.user : null;
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  // See CustomerManagementScreen.tsx's identical comment — Modal is
+  // outside AppScreen's SafeAreaView, so this clears the Android nav bar.
+  const insets = useSafeAreaInsets();
 
   const [rows, setRows] = useState<VendorInvoice[]>([]);
   const [summary, setSummary] = useState<VendorInvoiceSummary>({ totalAmount: 0, paidAmount: 0, unpaidAmount: 0 });
@@ -199,15 +203,8 @@ export const VendorInvoiceRegisterScreen: React.FC = () => {
   };
 
   return (
-    <AppScreen scroll={false}>
-      <View style={styles.appbar}>
-        <View style={styles.appbarTopRow}>
-          <Pressable style={styles.backButton} onPress={() => navigation.goBack()} hitSlop={8}>
-            <MaterialCommunityIcons name="chevron-left" size={22} color={colors.cream} />
-          </Pressable>
-          <Text style={styles.title}>Vendor Invoices</Text>
-        </View>
-      </View>
+    <AppScreen scroll={false} avatarInHeader>
+      <ScreenHeader title="Vendor Invoices" onBack={() => navigation.goBack()} />
 
       <View style={styles.body}>
         <View style={styles.summaryRow}>
@@ -302,7 +299,7 @@ export const VendorInvoiceRegisterScreen: React.FC = () => {
         animationType="slide"
         onRequestClose={() => setEditing(null)}
       >
-        <View style={styles.modalOverlay}>
+        <View style={[styles.modalOverlay, { paddingBottom: insets.bottom }]}>
           <View style={styles.modalCard}>
             <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
               <Text style={styles.modalTitle}>{editing === 'new' ? 'New Vendor Invoice' : 'Edit Vendor Invoice'}</Text>
@@ -450,10 +447,6 @@ export const VendorInvoiceRegisterScreen: React.FC = () => {
 
 const createStyles = (colors: ColorTokens) =>
   StyleSheet.create({
-    appbar: { backgroundColor: colors.chrome, padding: spacing.lg, paddingBottom: 14 },
-    appbarTopRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
-    backButton: { width: 28, height: 28, borderRadius: radii.pill, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
-    title: { flexShrink: 1, fontFamily: fonts.headingSemiBold, fontWeight: '600', fontSize: typography.screenHeading, color: colors.cream },
     body: { flex: 1, padding: 14, minHeight: 0 },
     summaryRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
     summaryCard: { flex: 1, backgroundColor: colors.peachCard, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, padding: spacing.sm, alignItems: 'center' },

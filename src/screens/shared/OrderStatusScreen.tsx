@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { RouteProp, useRoute } from '@react-navigation/native';
+import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { AppScreen } from '../../components/AppScreen';
+import { ScreenHeader } from '../../components/ScreenHeader';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import {
@@ -13,6 +14,8 @@ import {
   fetchInvoicePaymentSummary,
   generateIdempotencyKey,
   reportBankUpiPayment,
+  verifyPaymentLink,
+  resendPaymentLink,
   Order,
   OrderItem,
   InternalStatus,
@@ -24,7 +27,7 @@ import {
 import { fetchUsers, StaffUser } from '../../api/users';
 import { getDisplayName } from '../../utils/displayName';
 import { ApiError } from '../../api/client';
-import { ColorTokens, fonts, radii, spacing, typography } from '../../theme/theme';
+import { ColorTokens, radii, spacing, typography } from '../../theme/theme';
 
 type OrderStatusRoute = RouteProp<{ OrderStatus: { orderId: string } }, 'OrderStatus'>;
 
@@ -56,22 +59,34 @@ const getTurnaroundText = (items: OrderItem[]): string =>
     ? 'Dry Cleaning and Wash & Fold — expected delivery in 4 to 5 business working days.'
     : 'Turnaround time is typically 24–48 hours from pickup.';
 
-// CLAUDE.md "Payment marking — real gap": the four confirmed payment modes,
-// bundled into the same "mark Delivered" action for daily customers —
-// monthly-billing customers are settled via the ledger instead (see
-// orderService.ts's recordPayment, which 400s if attempted for one).
-const PAYMENT_METHOD_OPTIONS: { value: PaymentMethod; label: string }[] = [
+// Payment Recording simplification (2026-11-01, client request) — reduced
+// from 4 generic methods (Cash/UPI/Net Banking/Credit Card, all funneling
+// into one form) to 3, each with its own distinct panel, never more than
+// one visible at once. Mobile-only selection type — deliberately NOT the
+// same as the API's PaymentMethod (which stays 4-valued: the Razorpay
+// webhook still legitimately records net_banking/credit_card when a
+// customer pays via those methods on the Razorpay-hosted page; 'razorpay'
+// here never gets sent to recordOrderPayment at all, it only selects which
+// panel renders).
+type MethodSelection = 'cash' | 'upi' | 'razorpay';
+const METHOD_OPTIONS: { value: MethodSelection; label: string }[] = [
   { value: 'cash', label: 'Cash' },
   { value: 'upi', label: 'UPI' },
-  { value: 'net_banking', label: 'Net Banking' },
-  { value: 'credit_card', label: 'Credit Card' },
+  { value: 'razorpay', label: 'Razorpay' },
 ];
+const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
+  cash: 'Cash',
+  upi: 'UPI',
+  net_banking: 'Net Banking',
+  credit_card: 'Card',
+};
 
 // Shared by both stacks. The admin-only amount-revision card (Section D)
 // renders below the status track when user.role === 'admin' — staff never
 // see it, keeping "staff-visible parts only" true without a second screen.
 export const OrderStatusScreen: React.FC = () => {
   const route = useRoute<OrderStatusRoute>();
+  const navigation = useNavigation();
   const { state } = useAuth();
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -101,7 +116,7 @@ export const OrderStatusScreen: React.FC = () => {
   // pay at the moment of delivery. recordingPayment/paymentError are kept
   // separate from updating/error (the status-advance action) so the two
   // actions' loading/error states don't bleed into each other.
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod | null>(null);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<MethodSelection | null>(null);
   const [recordingPayment, setRecordingPayment] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [paymentNotice, setPaymentNotice] = useState<string | null>(null);
@@ -133,6 +148,16 @@ export const OrderStatusScreen: React.FC = () => {
   const [reportingBankUpi, setReportingBankUpi] = useState(false);
   const [bankUpiError, setBankUpiError] = useState<string | null>(null);
   const [bankUpiNotice, setBankUpiNotice] = useState<string | null>(null);
+
+  // Razorpay panel (2026-11-01) — no manual amount entry, ever. "Payment
+  // Received" never lets staff self-declare a payment; it only asks the
+  // backend to check (webhook receipts first, falling back to a live
+  // Razorpay check). "Resend Link" reuses a still-valid link where
+  // possible rather than always reissuing.
+  const [verifyingPayment, setVerifyingPayment] = useState(false);
+  const [resendingLink, setResendingLink] = useState(false);
+  const [razorpayError, setRazorpayError] = useState<string | null>(null);
+  const [razorpayNotice, setRazorpayNotice] = useState<string | null>(null);
 
   const loadOrder = useCallback(async () => {
     setLoading(true);
@@ -227,7 +252,7 @@ export const OrderStatusScreen: React.FC = () => {
   }, [selectedPaymentMethod, partialAmount, paymentSummary]);
 
   const handleRecordPayment = async () => {
-    if (!order || !selectedPaymentMethod) return;
+    if (!order || selectedPaymentMethod !== 'cash') return;
 
     const amount = partialAmount.trim() ? Number(partialAmount) : undefined;
     if (amount !== undefined && (!Number.isFinite(amount) || amount <= 0)) {
@@ -264,14 +289,23 @@ export const OrderStatusScreen: React.FC = () => {
           'This payment was more than the outstanding balance — the excess has been logged for admin review, not lost.'
         );
       }
+      // Real bug fixed (2026-11-01): a fresh key used to be issued here
+      // unconditionally, even on failure. The backend's idempotency check
+      // (orderService.ts::recordPayment) exists precisely so a RETRY of the
+      // exact same submission is safe — but that only works if the retry
+      // actually reuses the same key. A request can fail with a 500 AFTER
+      // the real Payment row was already committed (e.g. the payment itself
+      // succeeded but the subsequent Razorpay link-replacement step threw) —
+      // discarding the key on every failure meant the next tap sent a brand
+      // new key and created a genuine SECOND cash receipt for money already
+      // recorded once. Only rotate the key after a confirmed success; a
+      // retry after any failure now correctly reuses the same key, so the
+      // backend recognizes it as the same submission instead of a new one.
+      setIdempotencyKey(generateIdempotencyKey());
     } catch (err) {
       setPaymentError(err instanceof ApiError ? err.message : 'Could not record payment.');
     } finally {
       setRecordingPayment(false);
-      // Always issue a fresh key after a submission completes (success or
-      // failure) — a genuinely new tap must never accidentally reuse a key
-      // from a request that already went through.
-      setIdempotencyKey(generateIdempotencyKey());
     }
   };
 
@@ -299,6 +333,44 @@ export const OrderStatusScreen: React.FC = () => {
       setBankUpiError(err instanceof ApiError ? err.message : 'Could not report this payment.');
     } finally {
       setReportingBankUpi(false);
+    }
+  };
+
+  const handleVerifyPayment = async () => {
+    if (!order) return;
+    setVerifyingPayment(true);
+    setRazorpayError(null);
+    setRazorpayNotice(null);
+    try {
+      const result = await verifyPaymentLink(order.id);
+      setPaymentSummary(result.paymentSummary);
+      if (result.paymentSummary.status === 'paid') {
+        setRazorpayNotice('Payment confirmed — fully settled.');
+      } else if (result.reconciledNow) {
+        setRazorpayNotice(`A payment was found and recorded just now. ₹${result.paymentSummary.outstanding} still outstanding.`);
+      } else {
+        setRazorpayNotice(`Not yet paid. ₹${result.paymentSummary.outstanding} still outstanding.`);
+      }
+    } catch (err) {
+      setRazorpayError(err instanceof ApiError ? err.message : 'Could not check payment status.');
+    } finally {
+      setVerifyingPayment(false);
+    }
+  };
+
+  const handleResendLink = async () => {
+    if (!order) return;
+    setResendingLink(true);
+    setRazorpayError(null);
+    setRazorpayNotice(null);
+    try {
+      const result = await resendPaymentLink(order.id);
+      await loadPaymentSummary();
+      setRazorpayNotice(result.reused ? 'The existing payment link is still valid — resent as-is.' : 'A new payment link has been issued.');
+    } catch (err) {
+      setRazorpayError(err instanceof ApiError ? err.message : 'Could not resend the payment link.');
+    } finally {
+      setResendingLink(false);
     }
   };
 
@@ -342,13 +414,12 @@ export const OrderStatusScreen: React.FC = () => {
   const nextLabel = nextStatusLabel[order.internalStatus];
 
   return (
-    <AppScreen>
-      <View style={styles.appbar}>
-        <Text style={styles.title}>Order #{order.orderNumber}</Text>
-        <Text style={styles.subtitle}>
-          {order.customer.locationLabel} · {order.customer.fullName}
-        </Text>
-      </View>
+    <AppScreen avatarInHeader>
+      <ScreenHeader
+        title={`Order #${order.orderNumber}`}
+        subtitle={`${order.customer.locationLabel} · ${order.customer.fullName}`}
+        onBack={() => navigation.goBack()}
+      />
 
       <View style={styles.body}>
         <Text style={styles.sectionTitle}>Internal Progress</Text>
@@ -373,7 +444,7 @@ export const OrderStatusScreen: React.FC = () => {
 
         {order.paymentStatus === 'paid' && (
           <Text style={styles.hint}>
-            Payment received{order.paymentMethod ? ` · ${PAYMENT_METHOD_OPTIONS.find((o) => o.value === order.paymentMethod)?.label ?? order.paymentMethod}` : ''}
+            Payment received{order.paymentMethod ? ` · ${PAYMENT_METHOD_LABELS[order.paymentMethod] ?? order.paymentMethod}` : ''}
           </Text>
         )}
 
@@ -411,7 +482,7 @@ export const OrderStatusScreen: React.FC = () => {
 
             <Text style={styles.fieldLabel}>Payment Method</Text>
             <View style={styles.toggleRow}>
-              {PAYMENT_METHOD_OPTIONS.map((option) => (
+              {METHOD_OPTIONS.map((option) => (
                 <Pressable
                   key={option.value}
                   style={[styles.toggle, selectedPaymentMethod === option.value && styles.toggleActive]}
@@ -426,121 +497,176 @@ export const OrderStatusScreen: React.FC = () => {
               ))}
             </View>
 
-            <Text style={styles.fieldLabel}>
-              {selectedPaymentMethod === 'cash'
-                ? 'Amount Tendered (leave blank for the full outstanding balance)'
-                : 'Amount (leave blank for the full outstanding balance)'}
-            </Text>
-            <TextInput
-              style={styles.field}
-              value={partialAmount}
-              onChangeText={(text) => {
-                setPartialAmount(text);
-                setExcessHandling(null);
-              }}
-              keyboardType="decimal-pad"
-              placeholder={paymentSummary ? `₹${paymentSummary.outstanding}` : undefined}
-              placeholderTextColor={colors.muted}
-            />
+            {/* Exactly one panel visible at a time — never Cash and UPI
+                together (Priority 1, 2026-11-01). */}
+            {selectedPaymentMethod === 'cash' && (
+              <>
+                <Text style={styles.fieldLabel}>Amount Tendered (leave blank for the full outstanding balance)</Text>
+                <TextInput
+                  style={styles.field}
+                  value={partialAmount}
+                  onChangeText={(text) => {
+                    setPartialAmount(text);
+                    setExcessHandling(null);
+                  }}
+                  keyboardType="decimal-pad"
+                  placeholder={paymentSummary ? `₹${paymentSummary.outstanding}` : undefined}
+                  placeholderTextColor={colors.muted}
+                />
 
-            {/* Payment collection / customer advances rework — only shown
-                for cash, and only once the tendered amount actually
-                exceeds what's owed. Three explicit choices, per Phase 3:
-                staff must pick one, nothing is assumed. */}
-            {excessPreview > 0 && (
-              <View style={styles.excessBox}>
-                <Text style={styles.excessLabel}>₹{excessPreview} more than owed — how should this be handled?</Text>
-                {(
-                  [
-                    { value: 'return_change' as const, label: `Return ₹${excessPreview} change` },
-                    { value: 'advance' as const, label: 'Keep as customer advance' },
-                    { value: 'pending_review' as const, label: "Not sure — let Admin decide" },
-                  ]
-                ).map((option) => (
-                  <Pressable
-                    key={option.value}
-                    style={[styles.excessOption, excessHandling === option.value && styles.excessOptionActive]}
-                    onPress={() => setExcessHandling(option.value)}
-                  >
-                    <Text style={[styles.excessOptionText, excessHandling === option.value && styles.excessOptionTextActive]}>
-                      {option.label}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
+                {/* Payment collection / customer advances rework — shown
+                    only once the tendered amount actually exceeds what's
+                    owed. Three explicit choices: staff must pick one,
+                    nothing is assumed. */}
+                {excessPreview > 0 && (
+                  <View style={styles.excessBox}>
+                    <Text style={styles.excessLabel}>₹{excessPreview} more than owed — how should this be handled?</Text>
+                    {(
+                      [
+                        { value: 'return_change' as const, label: `Return ₹${excessPreview} change` },
+                        { value: 'advance' as const, label: 'Keep as customer advance' },
+                        { value: 'pending_review' as const, label: "Not sure — let Admin decide" },
+                      ]
+                    ).map((option) => (
+                      <Pressable
+                        key={option.value}
+                        style={[styles.excessOption, excessHandling === option.value && styles.excessOptionActive]}
+                        onPress={() => setExcessHandling(option.value)}
+                      >
+                        <Text style={[styles.excessOptionText, excessHandling === option.value && styles.excessOptionTextActive]}>
+                          {option.label}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                )}
+
+                {paymentError && <Text style={styles.error}>{paymentError}</Text>}
+                {paymentNotice && <Text style={styles.notice}>{paymentNotice}</Text>}
+
+                {/* Confirmation of exactly what happened — distinguishes
+                    tendered, applied, change returned, and advance created
+                    as four separate figures: these must never be treated
+                    as interchangeable. */}
+                {cashBreakdown && (
+                  <View style={styles.cashBreakdownBox}>
+                    <Text style={styles.cashBreakdownRow}>Amount Tendered: ₹{cashBreakdown.amountTendered}</Text>
+                    <Text style={styles.cashBreakdownRow}>Applied to Invoice: ₹{cashBreakdown.amountApplied}</Text>
+                    {cashBreakdown.changeReturned > 0 && (
+                      <Text style={styles.cashBreakdownRow}>Change Returned: ₹{cashBreakdown.changeReturned}</Text>
+                    )}
+                    {cashBreakdown.advanceCreated > 0 && (
+                      <Text style={styles.cashBreakdownRow}>Customer Advance Created: ₹{cashBreakdown.advanceCreated}</Text>
+                    )}
+                  </View>
+                )}
+
+                <Pressable
+                  style={[
+                    styles.advanceButton,
+                    (recordingPayment || (excessPreview > 0 && !excessHandling)) && styles.advanceButtonDisabled,
+                  ]}
+                  onPress={handleRecordPayment}
+                  disabled={recordingPayment || (excessPreview > 0 && !excessHandling)}
+                >
+                  {recordingPayment ? (
+                    <ActivityIndicator color={colors.white} />
+                  ) : (
+                    <Text style={styles.advanceButtonText}>Record Cash Payment</Text>
+                  )}
+                </Pressable>
+              </>
             )}
 
-            {paymentError && <Text style={styles.error}>{paymentError}</Text>}
-            {paymentNotice && <Text style={styles.notice}>{paymentNotice}</Text>}
-
-            {/* Confirmation of exactly what happened — distinguishes
-                tendered, applied, change returned, and advance created as
-                four separate figures, per Phase 8's "these must never be
-                treated as interchangeable." */}
-            {cashBreakdown && (
-              <View style={styles.cashBreakdownBox}>
-                <Text style={styles.cashBreakdownRow}>Amount Tendered: ₹{cashBreakdown.amountTendered}</Text>
-                <Text style={styles.cashBreakdownRow}>Applied to Invoice: ₹{cashBreakdown.amountApplied}</Text>
-                {cashBreakdown.changeReturned > 0 && (
-                  <Text style={styles.cashBreakdownRow}>Change Returned: ₹{cashBreakdown.changeReturned}</Text>
-                )}
-                {cashBreakdown.advanceCreated > 0 && (
-                  <Text style={styles.cashBreakdownRow}>Customer Advance Created: ₹{cashBreakdown.advanceCreated}</Text>
-                )}
-              </View>
+            {/* UPI — Payment-safety review section 7, Static Bank UPI
+                Workflow Stage A. This does NOT mark the order paid, it
+                stays pending until an admin verifies it against the real
+                bank account. */}
+            {selectedPaymentMethod === 'upi' && (
+              <>
+                <Text style={styles.fieldLabel}>Amount Received</Text>
+                <TextInput
+                  style={styles.field}
+                  value={bankUpiAmount}
+                  onChangeText={setBankUpiAmount}
+                  keyboardType="decimal-pad"
+                  placeholder="Amount received"
+                  placeholderTextColor={colors.muted}
+                />
+                <Text style={styles.fieldLabel}>UTR / Reference Number</Text>
+                <TextInput
+                  style={styles.field}
+                  value={bankUpiUtr}
+                  onChangeText={setBankUpiUtr}
+                  placeholder="UTR / reference number"
+                  placeholderTextColor={colors.muted}
+                  autoCapitalize="characters"
+                />
+                {bankUpiError && <Text style={styles.error}>{bankUpiError}</Text>}
+                {bankUpiNotice && <Text style={styles.notice}>{bankUpiNotice}</Text>}
+                <Pressable
+                  style={[styles.advanceButton, reportingBankUpi && styles.advanceButtonDisabled]}
+                  onPress={handleReportBankUpi}
+                  disabled={reportingBankUpi}
+                >
+                  {reportingBankUpi ? (
+                    <ActivityIndicator color={colors.white} />
+                  ) : (
+                    <Text style={styles.advanceButtonText}>Report Bank Transfer</Text>
+                  )}
+                </Pressable>
+              </>
             )}
 
-            <Pressable
-              style={[
-                styles.advanceButton,
-                (recordingPayment || !selectedPaymentMethod || (excessPreview > 0 && !excessHandling)) &&
-                  styles.advanceButtonDisabled,
-              ]}
-              onPress={handleRecordPayment}
-              disabled={recordingPayment || !selectedPaymentMethod || (excessPreview > 0 && !excessHandling)}
-            >
-              {recordingPayment ? (
-                <ActivityIndicator color={colors.white} />
-              ) : (
-                <Text style={styles.advanceButtonText}>Record Payment</Text>
-              )}
-            </Pressable>
+            {/* Razorpay — no manual amount entry, ever. "Payment Received"
+                never lets staff self-declare a payment; it only asks the
+                backend to check (webhook receipts first, falling back to a
+                live Razorpay check). "Resend Link" reuses a still-valid
+                link where possible rather than always reissuing. */}
+            {selectedPaymentMethod === 'razorpay' && (
+              <>
+                <View style={styles.summaryBox}>
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Link status</Text>
+                    <Text style={styles.summaryValue}>{paymentSummary?.paymentLinkStatus ?? 'none'}</Text>
+                  </View>
+                  {paymentSummary?.paymentLinkUrl && (
+                    <Pressable onPress={() => Linking.openURL(paymentSummary.paymentLinkUrl!)}>
+                      <Text style={[styles.summaryValue, styles.linkText]} numberOfLines={1}>
+                        {paymentSummary.paymentLinkUrl}
+                      </Text>
+                    </Pressable>
+                  )}
+                </View>
 
-            {/* Payment-safety review section 7, Static Bank UPI Workflow
-                Stage A — a separate, explicitly two-stage flow: this does
-                NOT mark the order paid, it stays pending until an admin
-                verifies it against the real bank account. */}
-            <View style={styles.bankUpiDivider} />
-            <Text style={styles.fieldLabel}>Or report a direct bank UPI transfer (static QR)</Text>
-            <TextInput
-              style={styles.field}
-              value={bankUpiAmount}
-              onChangeText={setBankUpiAmount}
-              keyboardType="decimal-pad"
-              placeholder="Amount received"
-              placeholderTextColor={colors.muted}
-            />
-            <TextInput
-              style={styles.field}
-              value={bankUpiUtr}
-              onChangeText={setBankUpiUtr}
-              placeholder="UTR / reference number"
-              placeholderTextColor={colors.muted}
-              autoCapitalize="characters"
-            />
-            {bankUpiError && <Text style={styles.error}>{bankUpiError}</Text>}
-            {bankUpiNotice && <Text style={styles.notice}>{bankUpiNotice}</Text>}
-            <Pressable
-              style={[styles.secondaryButton, reportingBankUpi && styles.advanceButtonDisabled]}
-              onPress={handleReportBankUpi}
-              disabled={reportingBankUpi}
-            >
-              {reportingBankUpi ? (
-                <ActivityIndicator color={colors.navyDeep} />
-              ) : (
-                <Text style={styles.secondaryButtonText}>Report Bank Transfer</Text>
-              )}
-            </Pressable>
+                {razorpayError && <Text style={styles.error}>{razorpayError}</Text>}
+                {razorpayNotice && <Text style={styles.notice}>{razorpayNotice}</Text>}
+
+                <Pressable
+                  style={[styles.advanceButton, verifyingPayment && styles.advanceButtonDisabled]}
+                  onPress={handleVerifyPayment}
+                  disabled={verifyingPayment}
+                >
+                  {verifyingPayment ? (
+                    <ActivityIndicator color={colors.white} />
+                  ) : (
+                    <Text style={styles.advanceButtonText}>Payment Received</Text>
+                  )}
+                </Pressable>
+
+                <Pressable
+                  style={[styles.secondaryButton, resendingLink && styles.advanceButtonDisabled]}
+                  onPress={handleResendLink}
+                  disabled={resendingLink}
+                >
+                  {resendingLink ? (
+                    <ActivityIndicator color={colors.navyDeep} />
+                  ) : (
+                    <Text style={styles.secondaryButtonText}>Resend Link</Text>
+                  )}
+                </Pressable>
+              </>
+            )}
           </View>
         )}
 
@@ -611,24 +737,6 @@ export const OrderStatusScreen: React.FC = () => {
 
 const createStyles = (colors: ColorTokens) =>
   StyleSheet.create({
-    appbar: {
-      backgroundColor: colors.chrome,
-      padding: spacing.lg,
-      paddingBottom: 14,
-      marginHorizontal: -14,
-      marginTop: -14,
-    },
-    title: {
-      fontFamily: fonts.headingSemiBold,
-      fontWeight: '600',
-      fontSize: typography.screenHeading,
-      color: colors.cream,
-    },
-    subtitle: {
-      fontSize: typography.secondary,
-      color: '#C8A67B',
-      marginTop: 2,
-    },
     body: {
       paddingTop: spacing.lg,
     },
@@ -788,6 +896,11 @@ const createStyles = (colors: ColorTokens) =>
     },
     summaryOutstanding: {
       color: colors.peachPrimary,
+    },
+    linkText: {
+      color: colors.peachPrimary,
+      textDecorationLine: 'underline',
+      marginTop: spacing.xs,
     },
     excessBox: {
       backgroundColor: colors.warningBg,

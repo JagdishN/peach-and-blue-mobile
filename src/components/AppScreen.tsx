@@ -43,8 +43,22 @@ export const AppScreen: React.FC<AppScreenProps> = ({
   const hideMenu = route.name === 'Settings' || route.name === 'Login';
   const menu = useAccountMenu();
 
+  // Footer/Android-nav-bar overlap fix (Priority 2, 2026-11-01) — this
+  // SafeAreaView deliberately excluded 'bottom' entirely before, so
+  // NivenxaFooter (its last child) had no bottom-inset protection on any
+  // screen. The 4 Admin tab-root screens are the one exception: their tab
+  // bar (AdminTabs.tsx, via @react-navigation/bottom-tabs) already pads
+  // itself for insets.bottom, so adding it here too would double-count
+  // that inset as an empty gap above the tab bar. Every other screen (all
+  // of Staff's flat stack, every Admin stack-pushed detail screen) has no
+  // such tab bar below it and needs the inset applied here.
+  const isAdminTabRoot = ['Orders', 'Catalogue', 'Customers', 'Ledger'].includes(route.name);
+  const edges: ('top' | 'left' | 'right' | 'bottom')[] = isAdminTabRoot
+    ? ['top', 'left', 'right']
+    : ['top', 'left', 'right', 'bottom'];
+
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: resolvedBackgroundColor }]} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: resolvedBackgroundColor }]} edges={edges}>
       {!hideMenu && !avatarInHeader && (
         <>
           <AccountMenuButton menu={menu} style={styles.globalSettingsButton} />

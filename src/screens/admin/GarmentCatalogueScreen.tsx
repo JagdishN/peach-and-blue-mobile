@@ -1,9 +1,11 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AppScreen } from '../../components/AppScreen';
+import { ScreenHeader } from '../../components/ScreenHeader';
 import { NivenxaFooter } from '../../components/BrandComponents';
 import { PriceChip } from '../../components/PriceChip';
 import { Tag } from '../../components/Tag';
@@ -30,6 +32,9 @@ export const GarmentCatalogueScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  // See CustomerManagementScreen.tsx's identical comment — Modal is
+  // outside AppScreen's SafeAreaView, so this clears the Android nav bar.
+  const insets = useSafeAreaInsets();
   const serviceTag = useMemo(() => getServiceTag(colors), [colors]);
 
   const [garments, setGarments] = useState<Garment[]>([]);
@@ -207,11 +212,8 @@ export const GarmentCatalogueScreen: React.FC = () => {
   };
 
   return (
-    <AppScreen scroll={false}>
-      <View style={styles.appbar}>
-        <Text style={styles.title}>Garment Catalogue</Text>
-        <Text style={styles.subtitle}>{garments.length} items · Editable by Admin only</Text>
-      </View>
+    <AppScreen scroll={false} avatarInHeader>
+      <ScreenHeader title="Garment Catalogue" subtitle={`${garments.length} items · Editable by Admin only`} />
 
       <View style={styles.body}>
         <TextInput
@@ -318,7 +320,7 @@ export const GarmentCatalogueScreen: React.FC = () => {
       </View>
 
       <Modal visible={editing !== null} transparent animationType="slide" onRequestClose={() => setEditing(null)}>
-        <View style={styles.modalOverlay}>
+        <View style={[styles.modalOverlay, { paddingBottom: insets.bottom }]}>
           <View style={styles.modalCard}>
             {/* See BranchesScreen.tsx's identical comment — this is the
                 longest form of the four, so the tallest-content risk. */}
@@ -497,39 +499,6 @@ export const GarmentCatalogueScreen: React.FC = () => {
 
 const createStyles = (colors: ColorTokens) =>
   StyleSheet.create({
-    appbar: {
-      backgroundColor: colors.chrome,
-      padding: spacing.lg,
-      paddingBottom: 14,
-    },
-    appbarTopRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'flex-start',
-    },
-    settingsButton: {
-      width: 28,
-      height: 28,
-      borderRadius: radii.pill,
-      backgroundColor: 'rgba(255,255,255,0.12)',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    settingsButtonText: {
-      fontSize: 14,
-      color: colors.cream,
-    },
-    title: {
-      fontFamily: fonts.headingSemiBold,
-      fontWeight: '600',
-      fontSize: typography.screenHeading,
-      color: colors.cream,
-    },
-    subtitle: {
-      fontSize: typography.secondary,
-      color: '#C8A67B',
-      marginTop: 2,
-    },
     body: {
       flex: 1,
       padding: 14,

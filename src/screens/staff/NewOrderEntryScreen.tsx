@@ -4,6 +4,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AppScreen } from '../../components/AppScreen';
+import { ScreenHeader } from '../../components/ScreenHeader';
 import { PriceChip } from '../../components/PriceChip';
 import { SanitizedTextInput } from '../../components/SanitizedTextInput';
 import { Tag } from '../../components/Tag';
@@ -13,12 +14,16 @@ import { fetchGarments, Garment } from '../../api/garments';
 import { createOrder } from '../../api/orders';
 import { searchCustomers, createCustomer, markBagIssued, CustomerLookup } from '../../api/customers';
 import { fetchCustomerCreditBalance } from '../../api/customerCredit';
+import { fetchBranches, Branch } from '../../api/branches';
 import { ApiError } from '../../api/client';
-import { ColorTokens, fonts, radii, spacing, typography } from '../../theme/theme';
+import { ColorTokens, radii, spacing, typography } from '../../theme/theme';
 import { getServiceTag, SPECIAL_CARE_TAG } from '../../theme/serviceTag';
-import type { StaffStackParamList } from '../../navigation/StaffStack';
 
-type Nav = NativeStackNavigationProp<StaffStackParamList, 'NewOrderEntry'>;
+// Priority 3 item 3 (2026-11-01, client request) — reachable from both
+// Staff's and Admin's stacks now (Admin previously had no order-creation
+// entry point at all); goBack() is the only navigation call this screen
+// itself makes, so an untyped NavigationProp is enough, no ParamList union.
+type Nav = NativeStackNavigationProp<Record<string, object | undefined>>;
 
 // Sourced from garments-seed-data-v2.json businessInfo.laundryMinimumKg —
 // mirrors the backend's order-level 5kg minimum (src/services/orderService.ts)
@@ -46,6 +51,12 @@ export const NewOrderEntryScreen: React.FC = () => {
   // getServiceTag's known 3 still needs a readable tag, not a crash.
   const tagFor = (type: string) => serviceTag[type] ?? { label: type, bg: colors.peachCard, color: colors.navyText };
   const user = state.status === 'signedIn' ? state.user : null;
+  // Priority 3 item 3 — an unscoped Admin (branchId === null) has no
+  // branch of their own to default to, unlike Staff (always branch-scoped).
+  // Only relevant when this screen is reached via AdminStack.
+  const needsBranchPicker = user?.role === 'admin' && user.branchId == null;
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
 
   const [garments, setGarments] = useState<Garment[]>([]);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
@@ -74,6 +85,11 @@ export const NewOrderEntryScreen: React.FC = () => {
   // null = haven't searched yet; [] = searched, no matches (show new-customer form).
   const [searchResults, setSearchResults] = useState<CustomerLookup[] | null>(null);
   const [confirmingNewCustomer, setConfirmingNewCustomer] = useState(false);
+  // Priority 3 item 6 — distinct from `error`: a 409 "already registered to
+  // a different customer/location" is a known, resolvable case (search
+  // instead of retrying), not a generic failure, so it gets its own notice
+  // styling rather than the same plain red text as every other validation.
+  const [duplicateCustomerNotice, setDuplicateCustomerNotice] = useState<string | null>(null);
 
   // CLAUDE.md "Laundry bag tracking" — free bag, issued once per customer;
   // surfaced here since staff is physically at the pickup handing it over.
@@ -103,6 +119,12 @@ export const NewOrderEntryScreen: React.FC = () => {
       .catch(() => setError('Could not load the garment catalogue.'))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (needsBranchPicker) {
+      fetchBranches().then(setBranches).catch(() => setBranches([]));
+    }
+  }, [needsBranchPicker]);
 
   // CLAUDE.md "Garment picker restructuring — service-type as parent" —
   // serviceType is the top-level grouping, picked via the tab row below
@@ -201,12 +223,26 @@ export const NewOrderEntryScreen: React.FC = () => {
 
   const estimatedTotal = useMemo(() => {
     let pieceTotal = 0;
-    let perKgRawTotal = 0;
+    let perKgTotal = 0;
+    // Mirror the backend's order-level 5kg minimum so this estimate matches
+    // what will actually be charged.
+    const perKgScale =
+      totalPerKgWeight > 0 && totalPerKgWeight < LAUNDRY_MINIMUM_KG ? LAUNDRY_MINIMUM_KG / totalPerKgWeight : 1;
 
     for (const garment of garments) {
       if (garment.pricingUnit === 'per_kg') {
         const weight = parseFloat(weights[garment.id] ?? '') || 0;
-        if (weight > 0) perKgRawTotal += weight * Number(garment.price);
+        if (weight > 0) {
+          // Priority 3 item 5 fix (2026-11-01): orderService.ts rounds each
+          // per-kg LINE individually after scaling, then sums the already-
+          // rounded lines — this used to scale+round the combined total
+          // once at the end instead, which can disagree by a paisa or two
+          // from what the backend actually persists/invoices when multiple
+          // per-kg garments at different prices are scaled below the 5kg
+          // minimum. Rounding per line here matches that order of
+          // operations exactly.
+          perKgTotal += Math.round(weight * Number(garment.price) * perKgScale * 100) / 100;
+        }
         continue;
       }
 
@@ -219,19 +255,13 @@ export const NewOrderEntryScreen: React.FC = () => {
       }
     }
 
-    // Mirror the backend's order-level 5kg minimum so this estimate matches
-    // what will actually be charged.
-    const perKgFinal =
-      totalPerKgWeight > 0 && totalPerKgWeight < LAUNDRY_MINIMUM_KG
-        ? perKgRawTotal * (LAUNDRY_MINIMUM_KG / totalPerKgWeight)
-        : perKgRawTotal;
-
-    return pieceTotal + perKgFinal;
+    return pieceTotal + perKgTotal;
   }, [garments, quantities, chosenPrices, enteredPrices, weights, totalPerKgWeight]);
 
   const handleConfirm = async () => {
-    if (!user?.branchId) {
-      setError('Your account is not assigned to a branch.');
+    const branchId = needsBranchPicker ? selectedBranchId : user?.branchId;
+    if (!branchId) {
+      setError(needsBranchPicker ? 'Choose a branch for this order.' : 'Your account is not assigned to a branch.');
       return;
     }
 
@@ -285,7 +315,7 @@ export const NewOrderEntryScreen: React.FC = () => {
         customerName,
         customerPhoneNumber,
         locationLabel,
-        branchId: user.branchId,
+        branchId,
         pickupDate: new Date().toISOString(),
         items,
       });
@@ -370,6 +400,7 @@ export const NewOrderEntryScreen: React.FC = () => {
 
     setError(null);
     setSearchError(null);
+    setDuplicateCustomerNotice(null);
     setConfirmingNewCustomer(true);
     try {
       const customer = await createCustomer({ fullName: trimmedName, phoneNumber: `+91${customerPhoneNumber}`, locationLabel });
@@ -377,7 +408,11 @@ export const NewOrderEntryScreen: React.FC = () => {
       setBagIssued(customer.bagIssued);
       setCustomerConfirmed(true);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not save this customer.');
+      if (err instanceof ApiError && err.status === 409) {
+        setDuplicateCustomerNotice(`${err.message} Search for this phone number above instead of adding it again.`);
+      } else {
+        setError(err instanceof ApiError ? err.message : 'Could not save this customer.');
+      }
     } finally {
       setConfirmingNewCustomer(false);
     }
@@ -400,6 +435,7 @@ export const NewOrderEntryScreen: React.FC = () => {
     setCustomerConfirmed(false);
     setSearchResults(null);
     setSearchError(null);
+    setDuplicateCustomerNotice(null);
     setPhoneQuery('');
     setCustomerName('');
     setCustomerPhoneNumber('');
@@ -502,15 +538,36 @@ export const NewOrderEntryScreen: React.FC = () => {
   };
 
   return (
-    <AppScreen scroll={false}>
-      <View style={styles.appbar}>
-        <Text style={styles.title}>New Order</Text>
-        <Text style={styles.subtitle}>Enter customer and garment details</Text>
-      </View>
+    <AppScreen scroll={false} avatarInHeader>
+      <ScreenHeader title="New Order" subtitle="Enter customer and garment details" onBack={() => navigation.goBack()} />
 
       <View style={styles.body}>
         {!customerConfirmed ? (
           <>
+            {/* Priority 3 item 3 — Admin now has an entry point to this
+                screen (AdminDashboardScreen's "New Order" card), but an
+                unscoped Admin has no branchId of their own to default to,
+                unlike Staff (always branch-scoped). Picked once, up front,
+                same chip-row pattern as VendorInvoiceRegisterScreen.tsx. */}
+            {needsBranchPicker && (
+              <>
+                <Text style={styles.fieldLabel}>Branch</Text>
+                <View style={styles.branchChipRow}>
+                  {branches.map((branch) => (
+                    <Pressable
+                      key={branch.id}
+                      style={[styles.tabChip, selectedBranchId === branch.id && styles.tabChipActive]}
+                      onPress={() => setSelectedBranchId(branch.id)}
+                    >
+                      <Text style={[styles.tabChipText, selectedBranchId === branch.id && styles.tabChipTextActive]}>
+                        {branch.branchName}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </>
+            )}
+
             <Text style={styles.fieldLabel}>Phone, Flat No. or Name</Text>
             <View style={styles.phoneSearchRow}>
               <SanitizedTextInput
@@ -586,6 +643,8 @@ export const NewOrderEntryScreen: React.FC = () => {
                   placeholderTextColor={colors.muted}
                   keyboardType="number-pad"
                 />
+                {duplicateCustomerNotice && <Text style={styles.duplicateNotice}>{duplicateCustomerNotice}</Text>}
+
                 <Pressable
                   testID="new-customer-confirm-button"
                   style={[styles.addButton, confirmingNewCustomer && styles.confirmButtonDisabled]}
@@ -743,21 +802,20 @@ export const NewOrderEntryScreen: React.FC = () => {
 
 const createStyles = (colors: ColorTokens) =>
   StyleSheet.create({
-    appbar: {
-      backgroundColor: colors.chrome,
-      padding: spacing.lg,
-      paddingBottom: 14,
+    branchChipRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: spacing.xs,
+      marginBottom: spacing.sm,
     },
-    title: {
-      fontFamily: fonts.headingSemiBold,
-      fontWeight: '600',
-      fontSize: typography.screenHeading,
-      color: colors.cream,
-    },
-    subtitle: {
+    duplicateNotice: {
       fontSize: typography.secondary,
-      color: '#C8A67B',
-      marginTop: 2,
+      color: colors.navyText,
+      backgroundColor: colors.warningBg,
+      borderRadius: radii.sm,
+      padding: spacing.sm,
+      marginTop: spacing.xs,
+      marginBottom: spacing.xs,
     },
     phoneSearchRow: {
       flexDirection: 'row',

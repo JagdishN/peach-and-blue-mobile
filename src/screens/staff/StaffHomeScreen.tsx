@@ -3,12 +3,13 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AppScreen } from '../../components/AppScreen';
+import { ScreenHeader } from '../../components/ScreenHeader';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { fetchBranch, Branch } from '../../api/branches';
 import { listOrders, Order, InternalStatus } from '../../api/orders';
 import { getDisplayName } from '../../utils/displayName';
-import { ColorTokens, fonts, radii, spacing, typography } from '../../theme/theme';
+import { ColorTokens, radii, spacing, typography } from '../../theme/theme';
 import type { StaffStackParamList } from '../../navigation/StaffStack';
 
 type Nav = NativeStackNavigationProp<StaffStackParamList, 'StaffHome'>;
@@ -58,16 +59,11 @@ export const StaffHomeScreen: React.FC = () => {
   );
 
   return (
-    <AppScreen scroll={false}>
-      <View style={styles.appbar}>
-        <View style={styles.appbarTopRow}>
-          <View>
-            <Text style={styles.title}>Today's Pickups</Text>
-            <Text style={styles.subtitle}>
-              {user?.fullName ? getDisplayName(user.fullName) : ''} · {orders.length} collected today
-            </Text>
-          </View>
-        </View>
+    <AppScreen scroll={false} avatarInHeader>
+      <ScreenHeader
+        title="Today's Pickups"
+        subtitle={`${user?.fullName ? getDisplayName(user.fullName) : ''} · ${orders.length} collected today`}
+      >
         {branch && (
           <View style={styles.branchChip}>
             <Text style={styles.branchChipText}>
@@ -75,13 +71,15 @@ export const StaffHomeScreen: React.FC = () => {
             </Text>
           </View>
         )}
-      </View>
+      </ScreenHeader>
 
       <View style={styles.listArea}>
         {loading ? (
           <ActivityIndicator color={colors.peachPrimary} style={{ marginTop: spacing.xl }} />
         ) : error ? (
           <Text style={styles.error}>{error}</Text>
+        ) : orders.length === 0 ? (
+          <Text style={styles.empty}>No pickups scheduled for today.</Text>
         ) : (
           <ScrollView style={styles.listScroll} showsVerticalScrollIndicator={false}>
             {orders.map((order) => {
@@ -117,27 +115,6 @@ export const StaffHomeScreen: React.FC = () => {
 
 const createStyles = (colors: ColorTokens) =>
   StyleSheet.create({
-    appbar: {
-      backgroundColor: colors.chrome,
-      padding: spacing.lg,
-      paddingBottom: 14,
-    },
-    appbarTopRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'flex-start',
-    },
-    title: {
-      fontFamily: fonts.headingSemiBold,
-      fontWeight: '600',
-      fontSize: typography.screenHeading,
-      color: colors.cream,
-    },
-    subtitle: {
-      fontSize: typography.secondary,
-      color: '#C8A67B',
-      marginTop: 2,
-    },
     branchChip: {
       alignSelf: 'flex-start',
       backgroundColor: 'rgba(255,255,255,0.12)',
@@ -227,6 +204,12 @@ const createStyles = (colors: ColorTokens) =>
     error: {
       color: colors.danger,
       fontSize: typography.secondary,
+      textAlign: 'center',
+      marginTop: spacing.xl,
+    },
+    empty: {
+      fontSize: typography.body,
+      color: colors.muted,
       textAlign: 'center',
       marginTop: spacing.xl,
     },

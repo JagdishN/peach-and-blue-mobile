@@ -3,11 +3,12 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AppScreen } from '../../components/AppScreen';
+import { ScreenHeader } from '../../components/ScreenHeader';
 import { PriceChip } from '../../components/PriceChip';
 import { useTheme } from '../../context/ThemeContext';
 import { fetchAgingReport, sendReminder, AgingRow } from '../../api/ledger';
 import { fetchInvoiceAgingReport, InvoiceAgingRow } from '../../api/outstanding';
-import { ColorTokens, fonts, radii, spacing, typography } from '../../theme/theme';
+import { ColorTokens, radii, spacing, typography } from '../../theme/theme';
 import type { AdminStackParamList } from '../../navigation/AdminStack';
 
 type Nav = NativeStackNavigationProp<AdminStackParamList>;
@@ -108,36 +109,39 @@ export const LedgerAgingScreen: React.FC = () => {
   }, [outstandingRows]);
 
   return (
-    <AppScreen scroll={false}>
-      <View style={styles.appbar}>
-        <Text style={styles.title}>Ledger</Text>
+    <AppScreen scroll={false} avatarInHeader>
+      <ScreenHeader title="Ledger">
+        {/* Priority 3 item 1 (2026-11-01): shortened labels + numberOfLines
+            so none of the three segments can wrap, regardless of device
+            width — "Outstanding Payments" was the one most at risk inside
+            a flex:1 third of this row. */}
         <View style={styles.segmentRow}>
           <Pressable
             style={[styles.segment, segment === 'monthly_billing' && styles.segmentActive]}
             onPress={() => setSegment('monthly_billing')}
           >
-            <Text style={[styles.segmentText, segment === 'monthly_billing' && styles.segmentTextActive]}>
-              Monthly Billing
+            <Text style={[styles.segmentText, segment === 'monthly_billing' && styles.segmentTextActive]} numberOfLines={1}>
+              Monthly
             </Text>
           </Pressable>
           <Pressable
             style={[styles.segment, segment === 'outstanding_payments' && styles.segmentActive]}
             onPress={() => setSegment('outstanding_payments')}
           >
-            <Text style={[styles.segmentText, segment === 'outstanding_payments' && styles.segmentTextActive]}>
-              Outstanding Payments
+            <Text style={[styles.segmentText, segment === 'outstanding_payments' && styles.segmentTextActive]} numberOfLines={1}>
+              Outstanding
             </Text>
           </Pressable>
           <Pressable
             style={[styles.segment, segment === 'reconciliation' && styles.segmentActive]}
             onPress={() => setSegment('reconciliation')}
           >
-            <Text style={[styles.segmentText, segment === 'reconciliation' && styles.segmentTextActive]}>
-              Reconciliation
+            <Text style={[styles.segmentText, segment === 'reconciliation' && styles.segmentTextActive]} numberOfLines={1}>
+              Recon
             </Text>
           </Pressable>
         </View>
-      </View>
+      </ScreenHeader>
 
       <View style={styles.body}>
         {segment === 'reconciliation' ? (
@@ -223,16 +227,6 @@ export const LedgerAgingScreen: React.FC = () => {
 
 const createStyles = (colors: ColorTokens) =>
   StyleSheet.create({
-    appbar: {
-      backgroundColor: colors.chrome,
-      padding: spacing.lg,
-      paddingBottom: 14,
-    },
-    appbarTopRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'flex-start',
-    },
     segmentRow: {
       flexDirection: 'row',
       gap: spacing.xs,
@@ -255,29 +249,6 @@ const createStyles = (colors: ColorTokens) =>
     },
     segmentTextActive: {
       color: colors.cream,
-    },
-    settingsButton: {
-      width: 28,
-      height: 28,
-      borderRadius: radii.pill,
-      backgroundColor: 'rgba(255,255,255,0.12)',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    settingsButtonText: {
-      fontSize: 14,
-      color: colors.cream,
-    },
-    title: {
-      fontFamily: fonts.headingSemiBold,
-      fontWeight: '600',
-      fontSize: typography.screenHeading,
-      color: colors.cream,
-    },
-    subtitle: {
-      fontSize: typography.secondary,
-      color: '#C8A67B',
-      marginTop: 2,
     },
     body: {
       flex: 1,

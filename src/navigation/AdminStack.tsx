@@ -9,11 +9,18 @@ import { StaffManagementScreen } from '../screens/admin/StaffManagementScreen';
 import { CustomerOutstandingScreen } from '../screens/admin/CustomerOutstandingScreen';
 import { VendorInvoiceRegisterScreen } from '../screens/admin/VendorInvoiceRegisterScreen';
 import { PaymentReconciliationScreen } from '../screens/admin/PaymentReconciliationScreen';
+import { NewOrderEntryScreen } from '../screens/staff/NewOrderEntryScreen';
 
 export type AdminStackParamList = {
   AdminTabs: undefined;
   OrderStatus: { orderId: string };
   Settings: undefined;
+  // Priority 3 item 3 (2026-11-01, client request) — Admin previously had
+  // no order-creation entry point at all; reached via the Overview "New
+  // Order" card. Reuses the same screen Staff already has, unmodified
+  // beyond adding a branch picker for an unscoped Admin (see
+  // NewOrderEntryScreen.tsx's needsBranchPicker).
+  NewOrderEntry: undefined;
   // Moved out of AdminTabs (bottom tab bar) into here, reached via the
   // Overview header's Setup icon — see SetupScreen.tsx.
   Setup: undefined;
@@ -36,6 +43,7 @@ export const AdminStack: React.FC = () => (
   <Stack.Navigator screenOptions={{ headerShown: false }}>
     <Stack.Screen name="AdminTabs" component={AdminTabs} />
     <Stack.Screen name="OrderStatus" component={OrderStatusScreen} />
+    <Stack.Screen name="NewOrderEntry" component={NewOrderEntryScreen} />
     <Stack.Screen name="Settings" component={SettingsScreen} />
     <Stack.Screen name="Setup" component={SetupScreen} />
     <Stack.Screen name="Branches" component={BranchesScreen} />

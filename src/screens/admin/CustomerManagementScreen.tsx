@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AppScreen } from '../../components/AppScreen';
+import { ScreenHeader } from '../../components/ScreenHeader';
 import { NivenxaFooter } from '../../components/BrandComponents';
 import { SanitizedTextInput } from '../../components/SanitizedTextInput';
 import { Tag } from '../../components/Tag';
@@ -54,6 +56,12 @@ export const CustomerManagementScreen: React.FC = () => {
   const { state } = useAuth();
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  // Modal renders in its own native window, outside AppScreen's
+  // SafeAreaView — on Android edge-to-edge (default since SDK 57) its
+  // bottom-anchored content otherwise sits under the system nav bar,
+  // reported in production as Save/Cancel being unreachable ("buried
+  // below the visible display area") on every Add/Edit sheet in the app.
+  const insets = useSafeAreaInsets();
   const user = state.status === 'signedIn' ? state.user : null;
 
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -464,11 +472,8 @@ export const CustomerManagementScreen: React.FC = () => {
   };
 
   return (
-    <AppScreen scroll={false}>
-      <View style={styles.appbar}>
-        <Text style={styles.title}>Customers</Text>
-        <Text style={styles.subtitle}>{customers.length} total · Billing & discount, admin-only</Text>
-      </View>
+    <AppScreen scroll={false} avatarInHeader>
+      <ScreenHeader title="Customers" subtitle={`${customers.length} total · Billing & discount, admin-only`} />
 
       <View style={styles.body}>
         <TextInput
@@ -517,7 +522,7 @@ export const CustomerManagementScreen: React.FC = () => {
       </View>
 
       <Modal visible={creating} transparent animationType="slide" onRequestClose={() => setCreating(false)}>
-        <View style={styles.modalOverlay}>
+        <View style={[styles.modalOverlay, { paddingBottom: insets.bottom }]}>
           <View style={styles.modalCard}>
             {/* See BranchesScreen.tsx's identical comment. */}
             <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
@@ -598,7 +603,7 @@ export const CustomerManagementScreen: React.FC = () => {
       </Modal>
 
       <Modal visible={editing !== null} transparent animationType="slide" onRequestClose={() => setEditing(null)}>
-        <View style={styles.modalOverlay}>
+        <View style={[styles.modalOverlay, { paddingBottom: insets.bottom }]}>
           <View style={styles.modalCard}>
             {/* See BranchesScreen.tsx's identical comment — this Edit sheet
                 is the longest form in the file (bag status/action included). */}
@@ -852,39 +857,6 @@ export const CustomerManagementScreen: React.FC = () => {
 
 const createStyles = (colors: ColorTokens) =>
   StyleSheet.create({
-    appbar: {
-      backgroundColor: colors.chrome,
-      padding: spacing.lg,
-      paddingBottom: 14,
-    },
-    appbarTopRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'flex-start',
-    },
-    settingsButton: {
-      width: 28,
-      height: 28,
-      borderRadius: radii.pill,
-      backgroundColor: 'rgba(255,255,255,0.12)',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    settingsButtonText: {
-      fontSize: 14,
-      color: colors.cream,
-    },
-    title: {
-      fontFamily: fonts.headingSemiBold,
-      fontWeight: '600',
-      fontSize: typography.screenHeading,
-      color: colors.cream,
-    },
-    subtitle: {
-      fontSize: typography.secondary,
-      color: '#C8A67B',
-      marginTop: 2,
-    },
     body: {
       flex: 1,
       padding: 14,

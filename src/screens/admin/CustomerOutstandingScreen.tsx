@@ -1,7 +1,8 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { RouteProp, useFocusEffect, useRoute } from '@react-navigation/native';
+import { RouteProp, useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { AppScreen } from '../../components/AppScreen';
+import { ScreenHeader } from '../../components/ScreenHeader';
 import { PriceChip } from '../../components/PriceChip';
 import { useTheme } from '../../context/ThemeContext';
 import {
@@ -20,7 +21,7 @@ import {
   REASON_CATEGORY_LABELS,
 } from '../../api/invoiceAdjustments';
 import { ApiError } from '../../api/client';
-import { ColorTokens, fonts, radii, spacing, typography } from '../../theme/theme';
+import { ColorTokens, radii, spacing, typography } from '../../theme/theme';
 
 const REASON_CATEGORIES: ReasonCategory[] = ['goodwill', 'discount_adjustment', 'billing_correction', 'other'];
 
@@ -40,6 +41,7 @@ type OutstandingRoute = RouteProp<{ CustomerOutstanding: { customerId: string } 
 // ever shown to staff at all, not even a disabled version of it.
 export const CustomerOutstandingScreen: React.FC = () => {
   const route = useRoute<OutstandingRoute>();
+  const navigation = useNavigation();
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
@@ -241,11 +243,12 @@ export const CustomerOutstandingScreen: React.FC = () => {
   const lastReminder = history[0];
 
   return (
-    <AppScreen>
-      <View style={styles.appbar}>
-        <Text style={styles.title}>Outstanding Payments</Text>
-        <Text style={styles.subtitle}>Combined outstanding: ₹{summary.totalOutstanding}</Text>
-      </View>
+    <AppScreen avatarInHeader>
+      <ScreenHeader
+        title="Outstanding Payments"
+        subtitle={`Combined outstanding: ₹${summary.totalOutstanding}`}
+        onBack={() => navigation.goBack()}
+      />
 
       <View style={styles.body}>
         <Text style={styles.sectionTitle}>Invoices</Text>
@@ -487,9 +490,6 @@ export const CustomerOutstandingScreen: React.FC = () => {
 
 const createStyles = (colors: ColorTokens) =>
   StyleSheet.create({
-    appbar: { backgroundColor: colors.chrome, padding: spacing.lg, paddingBottom: 14, marginHorizontal: -14, marginTop: -14 },
-    title: { fontFamily: fonts.headingSemiBold, fontWeight: '600', fontSize: typography.screenHeading, color: colors.cream },
-    subtitle: { fontSize: typography.secondary, color: '#C8A67B', marginTop: 2 },
     body: { paddingTop: spacing.lg },
     sectionTitle: { fontSize: typography.sectionHeading, fontWeight: '600', color: colors.navyText, marginBottom: spacing.sm },
     card: { backgroundColor: colors.peachCard, borderWidth: 1, borderColor: colors.border, borderRadius: radii.lg, padding: 12, marginBottom: 10 },

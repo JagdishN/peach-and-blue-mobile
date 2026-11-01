@@ -91,6 +91,8 @@ export const updateOrderStatus = (id: string, status: InternalStatus) =>
 // Payment-safety review (2026-10-30): outstanding/collected/allocated, in
 // rupees (the backend converts from its internal paise representation
 // before responding — mobile never deals with paise directly).
+export type PaymentLinkStatus = 'created' | 'paid' | 'cancelled' | 'expired';
+
 export interface InvoicePaymentSummary {
   required?: number;
   outstanding: number;
@@ -98,11 +100,35 @@ export interface InvoicePaymentSummary {
   allocated: number;
   status: 'unpaid' | 'partially_paid' | 'paid';
   byMethod?: Record<string, number>;
+  // Razorpay panel (2026-11-01) — null when no link exists yet for this
+  // order (e.g. monthly-billing, or outstanding already fully covered by
+  // credit at invoice generation time).
+  razorpayPaymentLinkId?: string | null;
+  paymentLinkUrl?: string | null;
+  paymentLinkStatus?: PaymentLinkStatus | null;
 }
 
 export const fetchInvoicePaymentSummary = (orderId: string) =>
   apiRequest<{ paymentSummary: InvoicePaymentSummary }>(`/api/v1/orders/${orderId}/payment-summary`).then(
     (res) => res.paymentSummary
+  );
+
+// Razorpay panel's "Payment Received" button — never self-declared by
+// staff: the backend checks already-recorded webhook receipts first,
+// falling back to a live Razorpay check, and only ever updates
+// payment/invoice state, never delivery status.
+export const verifyPaymentLink = (orderId: string) =>
+  apiRequest<{ paymentSummary: InvoicePaymentSummary; reconciledNow: boolean }>(
+    `/api/v1/orders/${orderId}/payment-link/verify`,
+    { method: 'POST' }
+  );
+
+// Razorpay panel's "Resend Link" button — reuses a still-valid existing
+// link where possible; only reissues when genuinely necessary.
+export const resendPaymentLink = (orderId: string) =>
+  apiRequest<{ reused: boolean; razorpayPaymentLinkId: string | null; paymentLinkUrl: string | null }>(
+    `/api/v1/orders/${orderId}/payment-link/resend`,
+    { method: 'POST' }
   );
 
 // Lightweight, client-generated, not cryptographically meaningful — just

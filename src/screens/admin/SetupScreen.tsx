@@ -4,8 +4,9 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AppScreen } from '../../components/AppScreen';
+import { ScreenHeader } from '../../components/ScreenHeader';
 import { useTheme } from '../../context/ThemeContext';
-import { ColorTokens, fonts, radii, spacing, typography } from '../../theme/theme';
+import { ColorTokens, radii, spacing, typography } from '../../theme/theme';
 import type { AdminStackParamList } from '../../navigation/AdminStack';
 
 type Nav = NativeStackNavigationProp<AdminStackParamList>;
@@ -20,17 +21,8 @@ export const SetupScreen: React.FC = () => {
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   return (
-    <AppScreen scroll={false}>
-      <View style={styles.appbar}>
-        <View style={styles.appbarRow}>
-          {/* AdminStack runs with headerShown: false, so there's no native
-              back button — same convention as SettingsScreen. */}
-          <Pressable style={styles.backButton} onPress={() => navigation.goBack()} hitSlop={8}>
-            <MaterialCommunityIcons name="chevron-left" size={22} color={colors.cream} />
-          </Pressable>
-          <Text style={styles.title}>Setup</Text>
-        </View>
-      </View>
+    <AppScreen scroll={false} avatarInHeader>
+      <ScreenHeader title="Setup" onBack={() => navigation.goBack()} />
 
       <View style={styles.body}>
         <Pressable style={styles.card} onPress={() => navigation.navigate('Branches')}>
@@ -76,36 +68,6 @@ export const SetupScreen: React.FC = () => {
 
 const createStyles = (colors: ColorTokens) =>
   StyleSheet.create({
-    appbar: {
-      backgroundColor: colors.chrome,
-      padding: spacing.lg,
-      paddingBottom: 14,
-    },
-    appbarRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.sm,
-      flexWrap: 'wrap',
-    },
-    backButton: {
-      width: 28,
-      height: 28,
-      borderRadius: radii.pill,
-      backgroundColor: 'rgba(255,255,255,0.12)',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    // flexShrink/flexWrap (here and on appbarRow above): defensive against
-    // Android's larger-text accessibility setting multiplying 24sp further
-    // next to the fixed-size back button — see StaffManagementScreen.tsx's
-    // identical fix for the concrete case this guards against.
-    title: {
-      flexShrink: 1,
-      fontFamily: fonts.headingSemiBold,
-      fontWeight: '600',
-      fontSize: typography.screenHeading,
-      color: colors.cream,
-    },
     body: {
       flex: 1,
       padding: 14,

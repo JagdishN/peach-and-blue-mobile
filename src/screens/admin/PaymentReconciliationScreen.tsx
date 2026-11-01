@@ -1,7 +1,8 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { AppScreen } from '../../components/AppScreen';
+import { ScreenHeader } from '../../components/ScreenHeader';
 import { PriceChip } from '../../components/PriceChip';
 import { useTheme } from '../../context/ThemeContext';
 import {
@@ -10,7 +11,7 @@ import {
   ReconciliationException,
   UnmatchedProviderPayment,
 } from '../../api/reconciliation';
-import { ColorTokens, fonts, radii, spacing, typography } from '../../theme/theme';
+import { ColorTokens, radii, spacing, typography } from '../../theme/theme';
 
 // Payment Reconciliation investigation views (2026-10-31) — READ-ONLY by
 // deliberate design: "Implement read-only investigation views first. Any
@@ -50,6 +51,7 @@ const unmatchedStatusLabel = (status: UnmatchedProviderPayment['status']): strin
 const rupees = (paise: number): number => Math.round(paise) / 100;
 
 export const PaymentReconciliationScreen: React.FC = () => {
+  const navigation = useNavigation();
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
@@ -86,11 +88,8 @@ export const PaymentReconciliationScreen: React.FC = () => {
   }
 
   return (
-    <AppScreen scroll={false}>
-      <View style={styles.appbar}>
-        <Text style={styles.title}>Payment Reconciliation</Text>
-        <Text style={styles.subtitle}>Investigation only</Text>
-      </View>
+    <AppScreen scroll={false} avatarInHeader>
+      <ScreenHeader title="Payment Reconciliation" subtitle="Investigation only" onBack={() => navigation.goBack()} />
 
       <View style={styles.body}>
         <View style={styles.disclaimer}>
@@ -178,9 +177,6 @@ export const PaymentReconciliationScreen: React.FC = () => {
 
 const createStyles = (colors: ColorTokens) =>
   StyleSheet.create({
-    appbar: { backgroundColor: colors.chrome, padding: spacing.lg, paddingBottom: 14 },
-    title: { fontFamily: fonts.headingSemiBold, fontWeight: '600', fontSize: typography.screenHeading, color: colors.cream },
-    subtitle: { fontSize: typography.secondary, color: '#C8A67B', marginTop: 2 },
     body: { flex: 1, padding: 14, minHeight: 0 },
     disclaimer: {
       backgroundColor: colors.warningBg,

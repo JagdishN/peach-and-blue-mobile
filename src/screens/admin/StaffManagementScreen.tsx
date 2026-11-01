@@ -1,10 +1,11 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { Alert, ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Picker } from '@react-native-picker/picker';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AppScreen } from '../../components/AppScreen';
+import { ScreenHeader } from '../../components/ScreenHeader';
 import { NivenxaFooter } from '../../components/BrandComponents';
 import { SanitizedTextInput } from '../../components/SanitizedTextInput';
 import { Tag } from '../../components/Tag';
@@ -33,6 +34,9 @@ export const StaffManagementScreen: React.FC = () => {
   const { state } = useAuth();
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  // See CustomerManagementScreen.tsx's identical comment — Modal is
+  // outside AppScreen's SafeAreaView, so this clears the Android nav bar.
+  const insets = useSafeAreaInsets();
   const user = state.status === 'signedIn' ? state.user : null;
 
   const [users, setUsers] = useState<StaffUser[]>([]);
@@ -177,18 +181,12 @@ export const StaffManagementScreen: React.FC = () => {
   };
 
   return (
-    <AppScreen scroll={false}>
-      <View style={styles.appbar}>
-        {/* Now reached via Setup (pushed from the stack), not a tab root —
-            needs its own back affordance, same convention as SettingsScreen. */}
-        <View style={styles.appbarTopRow}>
-          <Pressable style={styles.backButton} onPress={() => navigation.goBack()} hitSlop={8}>
-            <MaterialCommunityIcons name="chevron-left" size={22} color={colors.cream} />
-          </Pressable>
-          <Text style={styles.title}>Staff & Admin Accounts</Text>
-        </View>
-        <Text style={styles.subtitle}>{users.length} total · Admin-only, no passwords (OTP login)</Text>
-      </View>
+    <AppScreen scroll={false} avatarInHeader>
+      <ScreenHeader
+        title="Staff & Admin Accounts"
+        subtitle={`${users.length} total · Admin-only, no passwords (OTP login)`}
+        onBack={() => navigation.goBack()}
+      />
 
       <View style={styles.body}>
         {loading ? (
@@ -234,7 +232,7 @@ export const StaffManagementScreen: React.FC = () => {
       </View>
 
       <Modal visible={creating} transparent animationType="slide" onRequestClose={() => setCreating(false)}>
-        <View style={styles.modalOverlay}>
+        <View style={[styles.modalOverlay, { paddingBottom: insets.bottom }]}>
           <View style={styles.modalCard}>
             {/* See BranchesScreen.tsx's identical comment — larger field
                 text now makes this card's fixed maxHeight a real risk of
@@ -310,42 +308,6 @@ export const StaffManagementScreen: React.FC = () => {
 
 const createStyles = (colors: ColorTokens) =>
   StyleSheet.create({
-    appbar: {
-      backgroundColor: colors.chrome,
-      padding: spacing.lg,
-      paddingBottom: 14,
-    },
-    appbarTopRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.sm,
-      flexWrap: 'wrap',
-    },
-    backButton: {
-      width: 28,
-      height: 28,
-      borderRadius: radii.pill,
-      backgroundColor: 'rgba(255,255,255,0.12)',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    // Review finding: "Staff & Admin Accounts" at 24sp next to the 28px
-    // back button, with no shrink/wrap, would clip on a narrow device or
-    // under Android's larger-text accessibility setting. flexShrink lets it
-    // compress; appbarTopRow's flexWrap above is the fallback if it still
-    // doesn't fit at all (wraps below the back button rather than clipping).
-    title: {
-      flexShrink: 1,
-      fontFamily: fonts.headingSemiBold,
-      fontWeight: '600',
-      fontSize: typography.screenHeading,
-      color: colors.cream,
-    },
-    subtitle: {
-      fontSize: typography.secondary,
-      color: '#C8A67B',
-      marginTop: 2,
-    },
     body: {
       flex: 1,
       padding: 14,
