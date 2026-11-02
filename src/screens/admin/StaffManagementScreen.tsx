@@ -411,6 +411,10 @@ const createStyles = (colors: ColorTokens) =>
       borderTopRightRadius: radii.lg,
       padding: spacing.lg,
       maxHeight: '85%',
+      // See CustomerManagementScreen.tsx's identical comment — without
+      // this, the ScrollView child's flex:1 has no determinate parent box
+      // to resolve against and collapses to 0 height in release builds.
+      flexShrink: 1,
     },
     modalTitle: {
       fontFamily: fonts.headingSemiBold,

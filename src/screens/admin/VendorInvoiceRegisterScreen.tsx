@@ -482,7 +482,10 @@ const createStyles = (colors: ColorTokens) =>
     addButton: { backgroundColor: colors.peachPrimary, borderRadius: radii.md, paddingVertical: spacing.md, alignItems: 'center', marginTop: spacing.sm },
     addButtonText: { color: colors.white, fontWeight: '700', fontSize: typography.button },
     modalOverlay: { flex: 1, backgroundColor: 'rgba(14,33,66,0.4)', justifyContent: 'flex-end' },
-    modalCard: { backgroundColor: colors.surface, borderTopLeftRadius: radii.lg, borderTopRightRadius: radii.lg, padding: spacing.lg, maxHeight: '85%' },
+    // flexShrink:1 added — see CustomerManagementScreen.tsx's comment: without
+    // it the ScrollView child's flex:1 has no determinate parent box to
+    // resolve against and collapses to 0 height in release builds.
+    modalCard: { backgroundColor: colors.surface, borderTopLeftRadius: radii.lg, borderTopRightRadius: radii.lg, padding: spacing.lg, maxHeight: '85%', flexShrink: 1 },
     modalTitle: { fontFamily: fonts.headingSemiBold, fontWeight: '600', fontSize: typography.sectionHeading, color: colors.navyDeep, marginBottom: spacing.md },
     fieldLabel: { fontSize: typography.formLabel, fontWeight: '700', color: colors.navyText, marginBottom: spacing.xs, marginTop: spacing.sm },
     field: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, paddingVertical: spacing.sm, paddingHorizontal: spacing.md, fontSize: typography.formValue, color: colors.navyText },

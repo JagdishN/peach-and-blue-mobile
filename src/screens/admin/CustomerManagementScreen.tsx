@@ -948,6 +948,13 @@ const createStyles = (colors: ColorTokens) =>
       borderTopRightRadius: radii.lg,
       padding: spacing.lg,
       maxHeight: '85%',
+      // RN defaults flexShrink to 0 (unlike web CSS) — without this, Yoga
+      // has no determinate box to resolve the ScrollView child's flex:1
+      // against (this card's own height is otherwise purely content-based),
+      // which collapses the ScrollView to 0 height in release builds: the
+      // sheet opens but renders fully blank. flexShrink:1 gives it a basis
+      // to shrink from, breaking that circularity.
+      flexShrink: 1,
     },
     modalTitle: {
       fontFamily: fonts.headingSemiBold,

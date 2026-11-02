@@ -836,6 +836,12 @@ const createStyles = (colors: ColorTokens) =>
       fontSize: typography.formValue,
       color: colors.navyDeep,
       fontWeight: '700',
+      // Cash panel: when tendered is within the outstanding balance, nothing
+      // renders between this field and "Record Cash Payment" (no excess
+      // box/error/notice) — advanceButton's own marginTop alone (spacing.xs)
+      // left the two touching. This is the field's own bottom gap, so it
+      // holds regardless of what (if anything) renders next.
+      marginBottom: spacing.sm,
     },
     toggleRow: {
       flexDirection: 'row',
