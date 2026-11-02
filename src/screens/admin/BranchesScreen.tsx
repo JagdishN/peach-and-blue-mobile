@@ -1,11 +1,10 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AppScreen } from '../../components/AppScreen';
 import { ScreenHeader } from '../../components/ScreenHeader';
-import { NivenxaFooter } from '../../components/BrandComponents';
+import { FormSheet } from '../../components/FormSheet';
 import { Tag } from '../../components/Tag';
 import { useTheme } from '../../context/ThemeContext';
 import { fetchBranches, createBranch, updateBranch, Branch, BranchType } from '../../api/branches';
@@ -41,9 +40,6 @@ export const BranchesScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  // See CustomerManagementScreen.tsx's identical comment — Modal is
-  // outside AppScreen's SafeAreaView, so this clears the Android nav bar.
-  const insets = useSafeAreaInsets();
   // apartment's pastel pairing is fixed regardless of theme (small
   // self-contained badge, same treatment as theme/serviceTag.ts) — area's
   // successBg/success pairing flips together, consistently, like elsewhere.
@@ -149,17 +145,7 @@ export const BranchesScreen: React.FC = () => {
         </Pressable>
       </View>
 
-      <Modal visible={editing !== null} transparent animationType="slide" onRequestClose={() => setEditing(null)}>
-        <View style={[styles.modalOverlay, { paddingBottom: insets.bottom }]}>
-          <View style={styles.modalCard}>
-            {/* Review finding (typography pass follow-up): this card's
-                maxHeight was never paired with a scrollable child — fine
-                at the old, smaller field/label sizes, but larger text now
-                makes it plausible for a short device to push Save/Cancel
-                past the bottom with no way to reach them. ScrollView here
-                gets a bounded box to scroll within because modalCard's
-                maxHeight clamps it once content exceeds that ceiling. */}
-            <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+      <FormSheet visible={editing !== null} onClose={() => setEditing(null)}>
             <Text style={styles.modalTitle}>{editing === 'new' ? 'Add Branch' : 'Edit Branch'}</Text>
 
             <Text style={styles.fieldLabel}>Branch Name</Text>
@@ -232,14 +218,7 @@ export const BranchesScreen: React.FC = () => {
             <Pressable style={styles.cancelButton} onPress={() => setEditing(null)}>
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </Pressable>
-            </ScrollView>
-          </View>
-          {/* Modal renders in its own native layer above AppScreen's footer,
-              so it needs its own — CLAUDE.md's footer requirement is not
-              screen-scoped, it's "every screen", including this sheet. */}
-          <NivenxaFooter />
-        </View>
-      </Modal>
+      </FormSheet>
     </AppScreen>
   );
 };
@@ -294,22 +273,6 @@ const createStyles = (colors: ColorTokens) =>
       color: colors.white,
       fontWeight: '700',
       fontSize: typography.button,
-    },
-    modalOverlay: {
-      flex: 1,
-      backgroundColor: 'rgba(14,33,66,0.4)',
-      justifyContent: 'flex-end',
-    },
-    modalCard: {
-      backgroundColor: colors.surface,
-      borderTopLeftRadius: radii.lg,
-      borderTopRightRadius: radii.lg,
-      padding: spacing.lg,
-      maxHeight: '85%',
-      // See CustomerManagementScreen.tsx's identical comment — without
-      // this, the ScrollView child's flex:1 has no determinate parent box
-      // to resolve against and collapses to 0 height in release builds.
-      flexShrink: 1,
     },
     modalTitle: {
       fontFamily: fonts.headingSemiBold,

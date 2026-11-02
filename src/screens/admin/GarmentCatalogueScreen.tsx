@@ -1,12 +1,11 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ActivityIndicator, Pressable, ScrollView, SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AppScreen } from '../../components/AppScreen';
 import { ScreenHeader } from '../../components/ScreenHeader';
-import { NivenxaFooter } from '../../components/BrandComponents';
+import { FormSheet } from '../../components/FormSheet';
 import { PriceChip } from '../../components/PriceChip';
 import { Tag } from '../../components/Tag';
 import { useTheme } from '../../context/ThemeContext';
@@ -32,9 +31,6 @@ export const GarmentCatalogueScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  // See CustomerManagementScreen.tsx's identical comment — Modal is
-  // outside AppScreen's SafeAreaView, so this clears the Android nav bar.
-  const insets = useSafeAreaInsets();
   const serviceTag = useMemo(() => getServiceTag(colors), [colors]);
 
   const [garments, setGarments] = useState<Garment[]>([]);
@@ -319,12 +315,7 @@ export const GarmentCatalogueScreen: React.FC = () => {
         </Pressable>
       </View>
 
-      <Modal visible={editing !== null} transparent animationType="slide" onRequestClose={() => setEditing(null)}>
-        <View style={[styles.modalOverlay, { paddingBottom: insets.bottom }]}>
-          <View style={styles.modalCard}>
-            {/* See BranchesScreen.tsx's identical comment — this is the
-                longest form of the four, so the tallest-content risk. */}
-            <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+      <FormSheet visible={editing !== null} onClose={() => setEditing(null)}>
             <Text style={styles.modalTitle}>{editing === 'new' ? 'Add Garment' : 'Edit Garment'}</Text>
 
             <Text style={styles.fieldLabel}>Name</Text>
@@ -485,14 +476,7 @@ export const GarmentCatalogueScreen: React.FC = () => {
             <Pressable style={styles.cancelButton} onPress={() => setEditing(null)}>
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </Pressable>
-            </ScrollView>
-          </View>
-          {/* Modal renders in its own native layer above AppScreen's footer,
-              so it needs its own — CLAUDE.md's footer requirement is not
-              screen-scoped, it's "every screen", including this sheet. */}
-          <NivenxaFooter />
-        </View>
-      </Modal>
+      </FormSheet>
     </AppScreen>
   );
 };
@@ -621,28 +605,6 @@ const createStyles = (colors: ColorTokens) =>
       color: colors.white,
       fontWeight: '700',
       fontSize: typography.button,
-    },
-    modalOverlay: {
-      flex: 1,
-      backgroundColor: 'rgba(14,33,66,0.4)',
-      justifyContent: 'flex-end',
-    },
-    // Review finding: unlike the other three Add/Edit sheets in this app,
-    // this one had no maxHeight at all — on this, the longest form, larger
-    // field text made that a real risk of the card (anchored to the
-    // bottom by modalOverlay's justifyContent:'flex-end') growing taller
-    // than the screen, pushing its own top (and the ScrollView just added
-    // above) off-screen instead of scrolling within a bounded box.
-    modalCard: {
-      backgroundColor: colors.surface,
-      borderTopLeftRadius: radii.lg,
-      borderTopRightRadius: radii.lg,
-      padding: spacing.lg,
-      maxHeight: '85%',
-      // See CustomerManagementScreen.tsx's identical comment — without
-      // this, the ScrollView child's flex:1 has no determinate parent box
-      // to resolve against and collapses to 0 height in release builds.
-      flexShrink: 1,
     },
     modalTitle: {
       fontFamily: fonts.headingSemiBold,

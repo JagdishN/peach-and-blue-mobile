@@ -1,11 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AppScreen } from '../../components/AppScreen';
 import { ScreenHeader } from '../../components/ScreenHeader';
-import { NivenxaFooter } from '../../components/BrandComponents';
+import { FormSheet } from '../../components/FormSheet';
 import { SanitizedTextInput } from '../../components/SanitizedTextInput';
 import { Tag } from '../../components/Tag';
 import { useAuth } from '../../context/AuthContext';
@@ -56,12 +55,6 @@ export const CustomerManagementScreen: React.FC = () => {
   const { state } = useAuth();
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  // Modal renders in its own native window, outside AppScreen's
-  // SafeAreaView — on Android edge-to-edge (default since SDK 57) its
-  // bottom-anchored content otherwise sits under the system nav bar,
-  // reported in production as Save/Cancel being unreachable ("buried
-  // below the visible display area") on every Add/Edit sheet in the app.
-  const insets = useSafeAreaInsets();
   const user = state.status === 'signedIn' ? state.user : null;
 
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -521,11 +514,7 @@ export const CustomerManagementScreen: React.FC = () => {
         </Pressable>
       </View>
 
-      <Modal visible={creating} transparent animationType="slide" onRequestClose={() => setCreating(false)}>
-        <View style={[styles.modalOverlay, { paddingBottom: insets.bottom }]}>
-          <View style={styles.modalCard}>
-            {/* See BranchesScreen.tsx's identical comment. */}
-            <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+      <FormSheet visible={creating} onClose={() => setCreating(false)}>
             <Text style={styles.modalTitle}>Add Customer</Text>
 
             <Text style={styles.fieldLabel}>Full Name</Text>
@@ -596,18 +585,9 @@ export const CustomerManagementScreen: React.FC = () => {
             <Pressable style={styles.cancelButton} onPress={() => setCreating(false)}>
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </Pressable>
-            </ScrollView>
-          </View>
-          <NivenxaFooter />
-        </View>
-      </Modal>
+      </FormSheet>
 
-      <Modal visible={editing !== null} transparent animationType="slide" onRequestClose={() => setEditing(null)}>
-        <View style={[styles.modalOverlay, { paddingBottom: insets.bottom }]}>
-          <View style={styles.modalCard}>
-            {/* See BranchesScreen.tsx's identical comment — this Edit sheet
-                is the longest form in the file (bag status/action included). */}
-            <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+      <FormSheet visible={editing !== null} onClose={() => setEditing(null)}>
             <Text style={styles.modalTitle}>{editing?.fullName}</Text>
             <Text style={styles.modalSubtitle}>
               {editing?.locationLabel} · {editing?.branch.branchName}
@@ -843,14 +823,7 @@ export const CustomerManagementScreen: React.FC = () => {
             <Pressable style={styles.cancelButton} onPress={() => setEditing(null)}>
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </Pressable>
-            </ScrollView>
-          </View>
-          {/* Modal renders in its own native layer above AppScreen's footer,
-              so it needs its own — CLAUDE.md's footer requirement is not
-              screen-scoped, it's "every screen", including this sheet. */}
-          <NivenxaFooter />
-        </View>
-      </Modal>
+      </FormSheet>
     </AppScreen>
   );
 };
@@ -936,25 +909,6 @@ const createStyles = (colors: ColorTokens) =>
       color: colors.muted,
       marginTop: spacing.lg,
       textAlign: 'center',
-    },
-    modalOverlay: {
-      flex: 1,
-      backgroundColor: 'rgba(14,33,66,0.4)',
-      justifyContent: 'flex-end',
-    },
-    modalCard: {
-      backgroundColor: colors.surface,
-      borderTopLeftRadius: radii.lg,
-      borderTopRightRadius: radii.lg,
-      padding: spacing.lg,
-      maxHeight: '85%',
-      // RN defaults flexShrink to 0 (unlike web CSS) — without this, Yoga
-      // has no determinate box to resolve the ScrollView child's flex:1
-      // against (this card's own height is otherwise purely content-based),
-      // which collapses the ScrollView to 0 height in release builds: the
-      // sheet opens but renders fully blank. flexShrink:1 gives it a basis
-      // to shrink from, breaking that circularity.
-      flexShrink: 1,
     },
     modalTitle: {
       fontFamily: fonts.headingSemiBold,

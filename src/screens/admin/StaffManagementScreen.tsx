@@ -1,12 +1,11 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { Alert, ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Alert, ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AppScreen } from '../../components/AppScreen';
 import { ScreenHeader } from '../../components/ScreenHeader';
-import { NivenxaFooter } from '../../components/BrandComponents';
+import { FormSheet } from '../../components/FormSheet';
 import { SanitizedTextInput } from '../../components/SanitizedTextInput';
 import { Tag } from '../../components/Tag';
 import { useAuth } from '../../context/AuthContext';
@@ -34,9 +33,6 @@ export const StaffManagementScreen: React.FC = () => {
   const { state } = useAuth();
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  // See CustomerManagementScreen.tsx's identical comment — Modal is
-  // outside AppScreen's SafeAreaView, so this clears the Android nav bar.
-  const insets = useSafeAreaInsets();
   const user = state.status === 'signedIn' ? state.user : null;
 
   const [users, setUsers] = useState<StaffUser[]>([]);
@@ -231,13 +227,7 @@ export const StaffManagementScreen: React.FC = () => {
         </Pressable>
       </View>
 
-      <Modal visible={creating} transparent animationType="slide" onRequestClose={() => setCreating(false)}>
-        <View style={[styles.modalOverlay, { paddingBottom: insets.bottom }]}>
-          <View style={styles.modalCard}>
-            {/* See BranchesScreen.tsx's identical comment — larger field
-                text now makes this card's fixed maxHeight a real risk of
-                hiding Save/Cancel on a short device without this. */}
-            <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+      <FormSheet visible={creating} onClose={() => setCreating(false)}>
             <Text style={styles.modalTitle}>{editingUserId ? 'Edit Staff / Admin' : 'Add Staff / Admin'}</Text>
 
             <Text style={styles.fieldLabel}>Name</Text>
@@ -297,11 +287,7 @@ export const StaffManagementScreen: React.FC = () => {
             <Pressable style={styles.cancelButton} onPress={() => setCreating(false)}>
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </Pressable>
-            </ScrollView>
-          </View>
-          <NivenxaFooter />
-        </View>
-      </Modal>
+      </FormSheet>
     </AppScreen>
   );
 };
@@ -399,22 +385,6 @@ const createStyles = (colors: ColorTokens) =>
       color: colors.white,
       fontWeight: '700',
       fontSize: typography.button,
-    },
-    modalOverlay: {
-      flex: 1,
-      backgroundColor: 'rgba(14,33,66,0.4)',
-      justifyContent: 'flex-end',
-    },
-    modalCard: {
-      backgroundColor: colors.surface,
-      borderTopLeftRadius: radii.lg,
-      borderTopRightRadius: radii.lg,
-      padding: spacing.lg,
-      maxHeight: '85%',
-      // See CustomerManagementScreen.tsx's identical comment — without
-      // this, the ScrollView child's flex:1 has no determinate parent box
-      // to resolve against and collapses to 0 height in release builds.
-      flexShrink: 1,
     },
     modalTitle: {
       fontFamily: fonts.headingSemiBold,

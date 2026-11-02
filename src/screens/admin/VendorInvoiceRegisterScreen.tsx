@@ -1,11 +1,10 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AppScreen } from '../../components/AppScreen';
 import { ScreenHeader } from '../../components/ScreenHeader';
-import { NivenxaFooter } from '../../components/BrandComponents';
+import { FormSheet } from '../../components/FormSheet';
 import { PriceChip } from '../../components/PriceChip';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
@@ -58,9 +57,6 @@ export const VendorInvoiceRegisterScreen: React.FC = () => {
   const user = authState.status === 'signedIn' ? authState.user : null;
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  // See CustomerManagementScreen.tsx's identical comment — Modal is
-  // outside AppScreen's SafeAreaView, so this clears the Android nav bar.
-  const insets = useSafeAreaInsets();
 
   const [rows, setRows] = useState<VendorInvoice[]>([]);
   const [summary, setSummary] = useState<VendorInvoiceSummary>({ totalAmount: 0, paidAmount: 0, unpaidAmount: 0 });
@@ -293,15 +289,7 @@ export const VendorInvoiceRegisterScreen: React.FC = () => {
         </Pressable>
       </View>
 
-      <Modal
-        visible={editing !== null}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setEditing(null)}
-      >
-        <View style={[styles.modalOverlay, { paddingBottom: insets.bottom }]}>
-          <View style={styles.modalCard}>
-            <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+      <FormSheet visible={editing !== null} onClose={() => setEditing(null)}>
               <Text style={styles.modalTitle}>{editing === 'new' ? 'New Vendor Invoice' : 'Edit Vendor Invoice'}</Text>
 
               <Text style={styles.fieldLabel}>Vendor Name</Text>
@@ -436,11 +424,7 @@ export const VendorInvoiceRegisterScreen: React.FC = () => {
               <Pressable style={styles.cancelButton} onPress={() => setEditing(null)}>
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </Pressable>
-            </ScrollView>
-          </View>
-          <NivenxaFooter />
-        </View>
-      </Modal>
+      </FormSheet>
     </AppScreen>
   );
 };
@@ -481,11 +465,6 @@ const createStyles = (colors: ColorTokens) =>
     empty: { fontSize: typography.body, color: colors.muted, marginTop: spacing.lg, textAlign: 'center' },
     addButton: { backgroundColor: colors.peachPrimary, borderRadius: radii.md, paddingVertical: spacing.md, alignItems: 'center', marginTop: spacing.sm },
     addButtonText: { color: colors.white, fontWeight: '700', fontSize: typography.button },
-    modalOverlay: { flex: 1, backgroundColor: 'rgba(14,33,66,0.4)', justifyContent: 'flex-end' },
-    // flexShrink:1 added — see CustomerManagementScreen.tsx's comment: without
-    // it the ScrollView child's flex:1 has no determinate parent box to
-    // resolve against and collapses to 0 height in release builds.
-    modalCard: { backgroundColor: colors.surface, borderTopLeftRadius: radii.lg, borderTopRightRadius: radii.lg, padding: spacing.lg, maxHeight: '85%', flexShrink: 1 },
     modalTitle: { fontFamily: fonts.headingSemiBold, fontWeight: '600', fontSize: typography.sectionHeading, color: colors.navyDeep, marginBottom: spacing.md },
     fieldLabel: { fontSize: typography.formLabel, fontWeight: '700', color: colors.navyText, marginBottom: spacing.xs, marginTop: spacing.sm },
     field: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, paddingVertical: spacing.sm, paddingHorizontal: spacing.md, fontSize: typography.formValue, color: colors.navyText },
