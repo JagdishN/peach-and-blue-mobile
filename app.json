@@ -12,11 +12,11 @@
     },
     "android": {
       "package": "in.peachandblue.app",
-      "versionCode": 26,
+      "versionCode": 27,
       "adaptiveIcon": {
-       "foregroundImage": "./assets/adaptive-icon.png",
-      "monochromeImage": "./assets/monochrome-icon.png",
-      "backgroundColor": "#FEEDDE"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "monochromeImage": "./assets/monochrome-icon.png",
+        "backgroundColor": "#FEEDDE"
       },
       "predictiveBackGestureEnabled": false
     },
@@ -26,12 +26,16 @@
     "plugins": [
       "expo-secure-store",
       "expo-splash-screen",
-      ["expo-build-properties", {
-    "android": {
-      "enableProguardInReleaseBuilds": true,
-      "enableShrinkResourcesInReleaseBuilds": true
-    }
-  }]
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableProguardInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true
+          }
+        }
+      ],
+      "expo-font"
     ],
     "extra": {
       "eas": {
