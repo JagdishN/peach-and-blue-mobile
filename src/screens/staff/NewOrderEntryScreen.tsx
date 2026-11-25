@@ -4,6 +4,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AppScreen } from '../../components/AppScreen';
+import { GarmentIcon } from '../../components/GarmentIcon';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { PriceChip } from '../../components/PriceChip';
 import { SanitizedTextInput } from '../../components/SanitizedTextInput';
@@ -452,9 +453,10 @@ export const NewOrderEntryScreen: React.FC = () => {
         <View key={garment.id} style={[styles.garmentRow, isLast && styles.garmentRowLast]}>
           <View style={styles.garmentInfo}>
             <View style={styles.garmentNameRow}>
-              <MaterialCommunityIcons
-                name={(garment.iconKey ?? 'hanger') as any}
-                size={15}
+              <GarmentIcon
+                itemName={garment.itemName}
+                iconKey={garment.iconKey}
+                size={18}
                 color={colors.muted}
                 style={styles.garmentIcon}
               />
@@ -483,9 +485,10 @@ export const NewOrderEntryScreen: React.FC = () => {
       <View key={garment.id} style={[styles.garmentRow, isLast && styles.garmentRowLast]}>
         <View style={styles.garmentInfo}>
           <View style={styles.garmentNameRow}>
-            <MaterialCommunityIcons
-              name={(garment.iconKey ?? 'hanger') as any}
-              size={15}
+            <GarmentIcon
+              itemName={garment.itemName}
+              iconKey={garment.iconKey}
+              size={18}
               color={colors.muted}
               style={styles.garmentIcon}
             />

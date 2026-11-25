@@ -1,10 +1,11 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AppScreen } from '../../components/AppScreen';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
+import { ICON_LICENCES } from '../../theme/iconLicences';
 import { ColorTokens, fonts, spacing, radii, typography } from '../../theme/theme';
 
 // Houses the About content CLAUDE.md requires ("Technology by Nivenxa
@@ -18,6 +19,7 @@ export const SettingsScreen: React.FC = () => {
   const { signOut } = useAuth();
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const [showLicences, setShowLicences] = useState(false);
 
   return (
     <AppScreen>
@@ -46,6 +48,14 @@ export const SettingsScreen: React.FC = () => {
           >
             <Text style={styles.nivenxa}>Technology by Nivenxa Technologies</Text>
           </Pressable>
+          <Pressable
+            onPress={() => setShowLicences((shown) => !shown)}
+            accessibilityRole="button"
+            hitSlop={{ top: 10, bottom: 10, left: 12, right: 12 }}
+          >
+            <Text style={styles.licencesToggle}>{showLicences ? 'Hide icon licences' : 'Icon licences'}</Text>
+          </Pressable>
+          {showLicences && <Text style={styles.licences}>{ICON_LICENCES}</Text>}
         </View>
 
         <Text style={styles.sectionTitle}>Account</Text>
@@ -127,6 +137,18 @@ const createStyles = (colors: ColorTokens) =>
       color: colors.navyText,
       marginTop: spacing.xs,
       textDecorationLine: 'underline',
+    },
+    licencesToggle: {
+      fontSize: typography.caption,
+      color: colors.muted,
+      marginTop: spacing.md,
+      textDecorationLine: 'underline',
+    },
+    licences: {
+      fontSize: typography.caption,
+      color: colors.muted,
+      marginTop: spacing.sm,
+      alignSelf: 'stretch',
     },
     logoutButton: {
       flexDirection: 'row',

@@ -31,10 +31,7 @@ export interface Garment {
   // — RESOLVED"). Not yet surfaced in any screen — mirrored here for type
   // accuracy since listGarmentsHandler already returns it.
   requiresSpecialCare: boolean;
-  // CLAUDE.md "Icons for garment types" — a @expo/vector-icons
-  // MaterialCommunityIcons name, auto-assigned at seed time by keyword
-  // match, admin-overridable per item. Null only possible for a garment
-  // created before this field existed.
+  // Optional override: a theme/garmentIcons.ts name or a MaterialCommunityIcons glyph.
   iconKey: string | null;
   isActive: boolean;
   displayOrder: number;

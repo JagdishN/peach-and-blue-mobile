@@ -4,6 +4,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AppScreen } from '../../components/AppScreen';
+import { GarmentIcon } from '../../components/GarmentIcon';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { FormSheet } from '../../components/FormSheet';
 import { PriceChip } from '../../components/PriceChip';
@@ -285,9 +286,10 @@ export const GarmentCatalogueScreen: React.FC = () => {
               <Pressable style={styles.card} onPress={() => openEdit(garment)}>
                 <View style={styles.cardRow}>
                   <View style={styles.nameRow}>
-                    <MaterialCommunityIcons
-                      name={(garment.iconKey ?? 'hanger') as any}
-                      size={16}
+                    <GarmentIcon
+                      itemName={garment.itemName}
+                      iconKey={garment.iconKey}
+                      size={18}
                       color={colors.muted}
                       style={styles.garmentIcon}
                     />
@@ -443,10 +445,11 @@ export const GarmentCatalogueScreen: React.FC = () => {
               ))}
             </View>
 
-            <Text style={styles.fieldLabel}>Icon (MaterialCommunityIcons name, optional override)</Text>
+            <Text style={styles.fieldLabel}>Icon (optional — chosen from the name if left blank)</Text>
             <View style={styles.iconFieldRow}>
-              <MaterialCommunityIcons
-                name={(iconKey || 'hanger') as any}
+              <GarmentIcon
+                itemName={itemName}
+                iconKey={iconKey}
                 size={22}
                 color={colors.navyDeep}
                 style={styles.iconFieldPreview}
@@ -455,7 +458,7 @@ export const GarmentCatalogueScreen: React.FC = () => {
                 style={[styles.field, styles.iconField]}
                 value={iconKey}
                 onChangeText={setIconKey}
-                placeholder="tshirt-crew"
+                placeholder="e.g. saree, kurta, towel"
                 placeholderTextColor={colors.muted}
                 autoCapitalize="none"
               />
