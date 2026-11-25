@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "mobile",
+    "name": "Peach & Blue",
     "slug": "peach-and-blue-backend",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -12,11 +12,11 @@
     },
     "android": {
       "package": "in.peachandblue.app",
-      "versionCode": 23,
+      "versionCode": 24,
       "adaptiveIcon": {
-        "backgroundColor": "#FFFFFF",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+       "foregroundImage": "./assets/adaptive-icon.png",
+      "monochromeImage": "./assets/monochrome-icon.png",
+      "backgroundColor": "#FEEDDE"
       },
       "predictiveBackGestureEnabled": false
     },
